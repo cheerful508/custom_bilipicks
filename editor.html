@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>编辑我的学习站 · BiliPicks 乐学版</title>
+<script>try{if(localStorage.getItem('bilipicks-theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}</script>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:light;--bg:#f1f5fa;--surface:#fff;--soft:#e8eef6;--line:#d9e2ee;--ink:#152033;--muted:#5b6880;--accent:#0a76bd;--on-accent:#fff;--sun:#ffc531;--ok:#0f9457;--warn:#9a5b00;--bad:#c9384a;
+  --shadow:0 1px 2px rgba(21,32,51,.06),0 8px 24px rgba(21,32,51,.07);
+  --font:ui-rounded,"SF Pro Rounded","PingFang SC","HarmonyOS Sans SC","MiSans","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif}
+:root.dark{color-scheme:dark;--bg:#0e131b;--surface:#171f2b;--soft:#212b3a;--line:#2c3849;--ink:#eef3f9;--muted:#9aa7ba;--accent:#4eb5ef;--on-accent:#06243a;--ok:#35c986;--warn:#f0b24a;--bad:#ff7487}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-tap-highlight-color:transparent}
+a{color:inherit;text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0;text-align:inherit}
+h1,h2,h3,p{margin:0}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid color-mix(in oklab,var(--accent) 60%,transparent);outline-offset:2px;border-radius:8px}
+
+.top{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 20px;background:color-mix(in oklab,var(--surface) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.top h1{font-size:18px;font-weight:900;margin-right:auto}
+.who{display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap}
+.who select{height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface);padding:0 14px;font-weight:800;max-width:48vw}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 16px;border-radius:999px;font-weight:700;white-space:nowrap;background:var(--soft);color:var(--ink)}
+.btn:hover{background:color-mix(in oklab,var(--soft) 80%,var(--ink) 8%)}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.danger{background:color-mix(in oklab,var(--bad) 14%,var(--surface));color:var(--bad)}
+.btn.sm{min-height:32px;padding:0 12px;font-size:13.5px}
+.btn.ghost{background:none;border:1px solid var(--line)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.saved{color:var(--ok);font-weight:700;font-size:13px;min-width:90px;text-align:right;opacity:0;transition:opacity .2s}
+.saved.on{opacity:1}
+
+.wrap{max-width:1120px;margin:0 auto;padding:16px 20px 60px;display:grid;grid-template-columns:190px minmax(0,1fr);gap:20px;align-items:start}
+.tabs{position:sticky;top:78px;display:grid;gap:4px}
+.tabs button{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;font-weight:800;color:var(--muted)}
+.tabs button:hover{background:var(--soft);color:var(--ink)}
+.tabs button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.panel{min-width:0}
+.panel>h2{font-size:24px;font-weight:900;margin-bottom:4px}
+.lead{color:var(--muted);line-height:1.75;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+.card h3{font-size:16px;font-weight:800;margin-bottom:10px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label.f{display:grid;gap:4px;font-weight:700;font-size:13.5px;color:var(--muted);min-width:0}
+label.f.wide{grid-column:1/-1}
+input[type=text],input[type=number],input[type=url],input[type=password],select,textarea{width:100%;padding:8px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font-weight:500;outline:none;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);background:var(--surface)}
+textarea{resize:vertical;min-height:60px;line-height:1.6}
+.hint{color:var(--muted);font-size:12.5px;line-height:1.6}
+.chk{display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;min-height:36px}
+.chk input{width:20px;height:20px;accent-color:var(--ok)}
+.avs,.sws{display:flex;flex-wrap:wrap;gap:6px}
+.avs button{width:44px;height:44px;border-radius:12px;background:var(--bg);font-size:26px;display:grid;place-items:center;border:2px solid transparent}
+.avs button.on{border-color:var(--accent);background:var(--surface)}
+.sws button{width:36px;height:36px;border-radius:50%;border:3px solid var(--surface);box-shadow:0 0 0 2px var(--line)}
+.sws button.on{box-shadow:0 0 0 3px var(--ink)}
+.pv{display:flex;align-items:center;gap:14px;padding:14px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(120deg,color-mix(in oklab,var(--c) 16%,var(--surface)),var(--surface))}
+.pv .a{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:32px;background:var(--surface);box-shadow:0 0 0 3px color-mix(in oklab,var(--c) 45%,transparent)}
+.pv b{display:block;font-size:18px;font-weight:900}
+.pv span{color:var(--muted);font-size:13px}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.banner{padding:14px 16px;border-radius:16px;background:color-mix(in oklab,var(--sun) 22%,var(--surface));border:1px solid color-mix(in oklab,var(--sun) 50%,var(--line));margin-bottom:14px}
+.banner b{font-weight:800}
+
+/* 关卡 */
+details.stage{background:var(--surface);border:1px solid var(--line);border-radius:18px;margin-bottom:12px;overflow:hidden}
+details.stage>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+details.stage>summary::-webkit-details-marker{display:none}
+details.stage>summary .ic{font-size:26px;width:36px;text-align:center}
+details.stage>summary .nm{flex:1;min-width:0;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.stage>summary .cnt{color:var(--muted);font-size:13px;font-weight:600}
+.sbody{padding:4px 14px 14px;display:grid;gap:12px;border-top:1px dashed var(--line)}
+.sbar{display:flex;flex-wrap:wrap;gap:6px}
+.items{display:grid;gap:6px}
+.it{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px;border-radius:12px;background:var(--bg)}
+.cov{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--soft)}
+.cov img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.it .nt{padding:5px 9px;font-size:14px}
+.it small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.mv{display:flex;gap:2px}
+.mv button{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--muted);font-weight:800}
+.mv button:hover{background:var(--soft);color:var(--ink)}
+.mv button.x:hover{color:var(--bad)}
+
+/* 视频 */
+.vrow{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line);margin-bottom:8px}
+.vrow.off{opacity:.55}
+.vrow .t{font-weight:700;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vrow .s{color:var(--muted);font-size:12.5px;display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:2px}
+.tg{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--soft);font-size:12px;font-weight:700;color:var(--muted)}
+.tg.me{background:color-mix(in oklab,var(--accent) 16%,var(--surface));color:var(--accent)}
+.tg.off{background:color-mix(in oklab,var(--bad) 14%,var(--surface));color:var(--bad)}
+.vedit{grid-column:1/-1;padding:12px;border-radius:12px;background:var(--bg);display:grid;gap:10px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.filters input,.filters select{width:auto;flex:1 1 180px;height:40px;border-radius:999px;padding:0 14px}
+
+/* 弹层 */
+.modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(10,16,26,.5)}
+.mbox{width:min(720px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;border-radius:22px;background:var(--surface);box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
+.mh{flex:none;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.mh b{flex:1;font-weight:800;font-size:16px}
+.mb{flex:1;overflow-y:auto;padding:10px 14px}
+.mf{flex:none;display:flex;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.mf .hint{flex:1}
+.pk{display:grid;grid-template-columns:24px 80px minmax(0,1fr);gap:10px;align-items:center;padding:6px 4px;border-radius:12px;cursor:pointer}
+.pk:hover{background:var(--bg)}
+.pk input{width:20px;height:20px;accent-color:var(--ok)}
+.pk.in{opacity:.5;cursor:default}
+.pk .t{font-weight:700;font-size:14px;line-height:1.4}
+.pk small{color:var(--muted);font-size:12px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;max-width:92vw;padding:10px 18px;border-radius:20px;background:var(--ink);color:var(--bg);font-weight:700;font-size:14px;box-shadow:var(--shadow)}
+table.rules{border-collapse:collapse;width:100%;font-size:14px}
+table.rules td{padding:6px 8px;border-bottom:1px solid var(--line)}
+table.rules td:last-child{text-align:right;font-weight:800;white-space:nowrap}
+@media(max-width:820px){
+  .wrap{grid-template-columns:1fr;padding:12px 14px 60px}
+  .tabs{position:sticky;top:98px;z-index:30;display:flex;overflow-x:auto;gap:6px;padding:6px 0;background:var(--bg);scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:none;padding:8px 14px;background:var(--surface);border:1px solid var(--line)}
+  .top{padding:8px 14px}
+  .vrow{grid-template-columns:76px minmax(0,1fr)}
+  .vrow>.acts{grid-column:1/-1;margin:0}
+  .it{grid-template-columns:64px minmax(0,1fr)}
+  .it .mv{grid-column:1/-1;justify-content:flex-end}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>✏️ 编辑我的学习站</h1>
+  <div class="who"><span>正在编辑</span><select id="who" aria-label="选择孩子"></select></div>
+  <button type="button" class="btn sm" id="btn-add-kid">＋ 添加孩子</button>
+  <button type="button" class="btn primary sm" id="btn-preview">👀 用 TA 的身份预览</button>
+  <span class="saved" id="saved" role="status">已自动保存 ✓</span>
+</header>
+<div class="wrap">
+  <nav class="tabs" id="tabs" aria-label="编辑内容"></nav>
+  <main class="panel" id="panel"></main>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script src="data.js"></script>
+<script src="core.js"></script>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const E = BP.esc;
+const TABS = [['profile', '👤', '档案'], ['path', '🗺️', '学习路线'], ['videos', '🎞️', '视频清单'], ['explore', '🔬', '乐探究'], ['rewards', '🎁', '奖励'], ['backup', '💾', '备份与重置']];
+
+/* ---------- 家长口令 ---------- */
+(function gate() {
+  let ok = false;
+  try { ok = sessionStorage.getItem('bp2-editor-ok') === '1'; } catch (e) {}
+  if (BP.pin() && !ok) {
+    if (!BP.askPin('进入编辑器需要家长口令')) { location.replace('index.html'); throw new Error('locked'); }
+    try { sessionStorage.setItem('bp2-editor-ok', '1'); } catch (e) {}
+  }
+})();
+
+/* ---------- 状态 ---------- */
+let pid = BP.currentId() || BP.profiles()[0].id;
+let tab = 'profile';
+let custom = BP.getCustom(pid);
+let saveTimer, toastTimer;
+const openStages = {};
+let vFilter = {q: '', cat: '', show: 30}, openVideo = '', exVideo = '';
+
+const profile = () => BP.profile(pid);
+const merged = () => BP.buildData(BP.base, custom);
+const vmap = () => { const m = {}; merged().videos.forEach(v => { m[v.id] = v; }); return m; };
+function flash() { const s = $('#saved'); s.classList.add('on'); clearTimeout(flash.t); flash.t = setTimeout(() => s.classList.remove('on'), 1400); }
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { BP.saveCustom(custom, pid); flash(); }, 250); }
+function saveNow() { clearTimeout(saveTimer); BP.saveCustom(custom, pid); flash(); }
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600); }
+BP.hooks.toast = toast;
+const lines = s => String(s || '').split('\n').map(x => x.trim()).filter(Boolean);
+const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; };
+const cover = v => v && v.cover ? `<img src="${E(v.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '';
+const dl = (name, obj) => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 1)], {type: 'application/json'}));
+  a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+};
+
+/* ---------- 顶栏 ---------- */
+function paintWho() {
+  $('#who').innerHTML = BP.profiles().map(p => `<option value="${E(p.id)}" ${p.id === pid ? 'selected' : ''}>${E(p.avatar)} ${E(p.name)}（${p.age} 岁）</option>`).join('');
+}
+$('#who').onchange = e => { saveNow(); pid = e.target.value; custom = BP.getCustom(pid); openVideo = ''; exVideo = ''; render(); };
+$('#btn-add-kid').onclick = () => {
+  const name = prompt('新孩子的名字：', '');
+  if (name === null) return;
+  const p = BP.addProfile(name.trim() || undefined);
+  pid = p.id; custom = BP.getCustom(pid); tab = 'profile'; render(); toast('已添加，先给 TA 选个头像吧');
+};
+$('#btn-preview').onclick = () => { saveNow(); BP.setCurrent(pid); location.href = 'index.html'; };
+function paintTabs() {
+  $('#tabs').innerHTML = TABS.map(t => `<button type="button" data-tab="${t[0]}" class="${t[0] === tab ? 'on' : ''}"><span>${t[1]}</span>${t[2]}</button>`).join('');
+}
+$('#tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; history.replaceState(null, '', '#' + tab); render(); window.scrollTo(0, 0); } };
+
+/* ---------- 弹层 ---------- */
+function modal(title, body, foot, onMount) {
+  const w = document.createElement('div');
+  w.className = 'modal';
+  w.innerHTML = `<div class="mbox" role="dialog" aria-modal="true"><div class="mh"><b>${E(title)}</b><button type="button" class="btn sm" data-x>关闭</button></div><div class="mb">${body}</div><div class="mf">${foot || ''}</div></div>`;
+  document.body.appendChild(w);
+  const close = () => { document.removeEventListener('keydown', onKey); w.remove(); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  w.addEventListener('click', e => { if (e.target === w || e.target.closest('[data-x]')) close(); });
+  if (onMount) onMount(w, close);
+  return {w, close};
+}
+
+/* ---------- 档案 ---------- */
+function paintPreview() {
+  const p = profile(), lv = BP.level(BP.game(pid).earned);
+  $('#pv').style.setProperty('--c', p.theme);
+  $('#pv').innerHTML = `<span class="a">${E(p.avatar)}</span><div><b>你好，${E(p.name)}！</b><span>${E(p.slogan || '')}　·　${p.age} 岁　·　Lv.${lv.no} ${lv.icon} ${E(lv.name)}</span></div>`;
+}
+function renderProfile() {
+  const p = profile();
+  $('#panel').innerHTML = `<h2>👤 档案</h2><p class="lead">名字、头像、颜色、口号，都是孩子自己的。年龄会影响乐探究里提问的难度（11 岁以上多一道进阶题）。</p>
+  <div class="card"><div class="pv" id="pv"></div></div>
+  <div class="card"><div class="row">
+    <label class="f">名字<input type="text" data-pf="name" value="${E(p.name)}" maxlength="12"></label>
+    <label class="f">年龄<input type="number" data-pf="age" min="5" max="16" value="${p.age}"></label>
+    <label class="f">每天学习目标（次）<select data-pf="goal">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${+p.goal === n ? 'selected' : ''}>${n} 次（看完 / 做任务 / 探究各算 1 次）</option>`).join('')}</select></label>
+    <label class="f wide">口号（显示在首页）<input type="text" data-pf="slogan" value="${E(p.slogan || '')}" maxlength="30"></label>
+  </div>
+  <h3 style="margin-top:16px">头像</h3><div class="avs">${BP.AVATARS.map(a => `<button type="button" data-av="${a}" class="${a === p.avatar ? 'on' : ''}">${a}</button>`).join('')}</div>
+  <label class="f" style="margin-top:8px;max-width:260px">或者输入任意一个表情<input type="text" data-pf="avatar" value="${E(p.avatar)}" maxlength="4"></label>
+  <h3 style="margin-top:16px">主题色</h3><div class="sws">${BP.THEMES.map(c => `<button type="button" data-th="${c}" style="background:${c}" class="${c === p.theme ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div>
+  <label class="chk" style="margin-top:12px"><input type="checkbox" data-pf="sound" ${p.sound === false ? '' : 'checked'}>庆祝时播放音效</label>
+  </div>
+  <div class="card"><h3>🔐 家长口令（可选，所有孩子共用）</h3><p class="hint" style="margin-bottom:8px">设置后，进入编辑器和「标记已兑现」都要输入口令。这只能防住孩子随手点开，不是真正的安全措施。留空保存＝取消口令。</p>
+    <div class="acts" style="margin-top:0"><input type="password" id="pin" placeholder="新口令" style="max-width:200px" value="${E(BP.pin())}"><button type="button" class="btn" id="pin-save">保存口令</button></div></div>
+  <div class="card"><h3>删除这个档案</h3><p class="hint">会同时删除 TA 的进度、星星、探究记录和所有自定义内容，无法恢复。至少要保留一个档案。</p><div class="acts"><button type="button" class="btn danger" id="del-kid">删除「${E(p.name)}」</button></div></div>`;
+  paintPreview();
+}
+
+/* ---------- 路线 ---------- */
+function renderPath() {
+  const p = custom.path, vm = vmap(), kid = profile();
+  if (!p) {
+    $('#panel').innerHTML = `<h2>🗺️ 学习路线</h2><p class="lead">现在 ${E(kid.name)} 用的是公共路线（${BP.basePath().stages.length} 关）。想要自己的路线，先复制一份，之后就能随便增删改。</p>
+    <div class="card"><h3>开始自定义 ${E(kid.name)} 的路线</h3><div class="acts" style="margin-top:0">
+      <button type="button" class="btn primary" data-act="path-start" data-mode="full">复制完整公共路线</button>
+      <button type="button" class="btn" data-act="path-start" data-mode="five">只要前 5 关（适合 9～10 岁起步）</button>
+      <button type="button" class="btn" data-act="path-start" data-mode="blank">从空白开始</button></div>
+      <p class="hint" style="margin-top:10px">已经看完的记录不会丢：进度按视频记，不按路线记。</p></div>`;
+    return;
+  }
+  const stages = p.stages.map((st, si) => {
+    const items = st.items.map((it, ii) => {
+      const v = vm[it.id];
+      return `<div class="it"><span class="cov">${cover(v)}</span><div><input type="text" class="nt" data-sc="item" data-s="${si}" data-i="${ii}" data-k="note" value="${E(it.note || '')}" placeholder="这一步的说明">
+        <small>${v ? E(v.title) + (v.hidden ? '（已隐藏）' : '') : '⚠️ 这条视频已不在清单里，建议删除'}</small></div>
+        <div class="mv"><button type="button" data-act="it-up" data-s="${si}" data-i="${ii}" aria-label="上移">↑</button><button type="button" data-act="it-down" data-s="${si}" data-i="${ii}" aria-label="下移">↓</button><button type="button" class="x" data-act="it-del" data-s="${si}" data-i="${ii}" aria-label="删除">✕</button></div></div>`;
+    }).join('') || '<p class="hint">这一关还没有视频，点下面「添加视频」。</p>';
+    const m = st.mission || {};
+    return `<details class="stage" data-key="${E(st.key)}" ${openStages[st.key] ? 'open' : ''}><summary><span class="ic">${E(st.icon || '⭐')}</span><span class="nm">第 ${si + 1} 关　${E(st.name)}</span><span class="cnt">${st.items.length} 条</span></summary>
+      <div class="sbody">
+        <div class="row">
+          <label class="f">图标（一个表情）<input type="text" data-sc="stage" data-s="${si}" data-k="icon" value="${E(st.icon || '')}" maxlength="4"></label>
+          <label class="f">关卡名字<input type="text" data-sc="stage" data-s="${si}" data-k="name" value="${E(st.name)}"></label>
+          <label class="f">适合年龄 / 小提示<input type="text" data-sc="stage" data-s="${si}" data-k="age" value="${E(st.age || '')}" placeholder="例如：9 岁+ · 现在就能看"></label>
+        </div>
+        <label class="f">这一关想达成什么<textarea data-sc="stage" data-s="${si}" data-k="goal">${E(st.goal || '')}</textarea></label>
+        <label class="chk"><input type="checkbox" data-sc="stage" data-s="${si}" data-k="later" ${st.later ? 'checked' : ''}>留到以后再看（灰色、折叠起来）</label>
+        <div><h3 style="font-size:14px;margin-bottom:6px">这一关的视频</h3><div class="items">${items}</div>
+          <div class="acts"><button type="button" class="btn sm primary" data-act="it-add" data-s="${si}">＋ 添加视频</button></div></div>
+        <div class="card" style="margin:0;background:var(--bg)"><h3 style="font-size:14px">🔧 动手任务（通关后做）</h3><div class="row">
+          <label class="f wide">任务内容<textarea data-sc="mission" data-s="${si}" data-k="text" placeholder="例如：用纸和硬币做一个承重实验……">${E(m.text || '')}</textarea></label>
+          <label class="f">参考网站（可选）<input type="url" data-sc="mission" data-s="${si}" data-k="url" value="${E(m.url || '')}" placeholder="https://"></label>
+          <label class="f">按钮上的字<input type="text" data-sc="mission" data-s="${si}" data-k="label" value="${E(m.label || '')}" placeholder="网站名"></label></div></div>
+        <div class="sbar"><button type="button" class="btn sm" data-act="st-up" data-s="${si}">↑ 上移这一关</button><button type="button" class="btn sm" data-act="st-down" data-s="${si}">↓ 下移</button><button type="button" class="btn sm danger" data-act="st-del" data-s="${si}">删除这一关</button></div>
+      </div></details>`;
+  }).join('');
+  $('#panel').innerHTML = `<h2>🗺️ ${E(kid.name)} 的学习路线</h2><p class="lead">一关一关往前闯。每一关可以放几条视频，再配一个动手任务。改动自动保存，回到首页刷新就能看到。</p>
+  <div class="card"><div class="row"><label class="f">路线名字<input type="text" data-sc="path" data-k="title" value="${E(p.title || '')}"></label>
+    <label class="f wide">路线说明<textarea data-sc="path" data-k="intro">${E(p.intro || '')}</textarea></label>
+    <label class="f wide">给家长的建议（一行一条）<textarea data-sc="path" data-k="tips">${E((p.tips || []).join('\n'))}</textarea></label></div></div>
+  ${stages || '<p class="hint">还没有关卡。</p>'}
+  <div class="acts"><button type="button" class="btn primary" data-act="st-add">＋ 添加一关</button><button type="button" class="btn danger" data-act="path-reset">换回公共路线</button></div>`;
+}
+function openPicker(si) {
+  const st = custom.path.stages[si], have = new Set(); custom.path.stages.forEach(s => s.items.forEach(i => have.add(i.id)));
+  const vids = merged().videos.filter(v => !v.hidden);
+  const cats = [...new Set(vids.map(v => v.category))];
+  const body = `<div class="filters"><input type="text" id="pk-q" placeholder="搜标题、UP 主"><select id="pk-c"><option value="">全部分类</option>${cats.map(c => `<option>${E(c)}</option>`).join('')}</select></div><div id="pk-list"></div>`;
+  modal(`给「${st.name}」添加视频`, body, '<span class="hint">灰色的已经在某一关里了</span><button type="button" class="btn primary" id="pk-ok">添加所选</button>', (w, close) => {
+    const picked = new Set();
+    const paint = () => {
+      const q = $('#pk-q', w).value.trim().toLowerCase(), c = $('#pk-c', w).value;
+      $('#pk-list', w).innerHTML = vids.filter(v => (!c || v.category === c) && (!q || `${v.title} ${v.channel}`.toLowerCase().includes(q))).slice(0, 80).map(v => {
+        const inn = have.has(v.id);
+        return `<label class="pk ${inn ? 'in' : ''}"><input type="checkbox" value="${E(v.id)}" ${inn ? 'disabled' : ''} ${picked.has(v.id) ? 'checked' : ''}><span class="cov">${cover(v)}</span><span><span class="t">${E(v.title)}</span><br><small>${E(v.channel)} · ${E(v.category)} · ${v.minAge}+</small></span></label>`;
+      }).join('') || '<p class="hint">没有匹配的视频。</p>';
+    };
+    paint();
+    $('#pk-q', w).oninput = paint; $('#pk-c', w).onchange = paint;
+    $('#pk-list', w).onchange = e => { if (e.target.checked) picked.add(e.target.value); else picked.delete(e.target.value); };
+    $('#pk-ok', w).onclick = () => {
+      const vm = vmap();
+      picked.forEach(id => { const v = vm[id]; st.items.push({id, note: (v && (v.reason || v.title) || '').slice(0, 40)}); });
+      close(); saveNow(); openStages[st.key] = true; renderPath(); if (picked.size) toast(`已添加 ${picked.size} 条`);
+    };
+  });
+}
+
+/* ---------- 视频 ---------- */
+function renderVideos() {
+  const m = merged(), cats = m.categories, all = m.videos;
+  const list = all.filter(v => (!vFilter.cat || v.category === vFilter.cat) && (!vFilter.q || `${v.title} ${v.channel} ${v.category}`.toLowerCase().includes(vFilter.q.toLowerCase())));
+  const rows = list.slice(0, vFilter.show).map(v => {
+    const ed = custom.videoEdits[v.id], open = openVideo === v.id;
+    return `<div class="vrow ${v.hidden ? 'off' : ''}" id="v-${E(v.id)}"><span class="cov">${cover(v)}</span>
+      <div><div class="t">${E(v.title)}</div><div class="s"><span>${E(v.channel || '')}</span><span class="tg">${E(v.category)}</span><span class="tg">${v.minAge}+</span>${v.custom ? '<span class="tg me">自己加的</span>' : ''}${ed ? '<span class="tg me">改过</span>' : ''}${v.hidden ? '<span class="tg off">已隐藏</span>' : ''}</div></div>
+      <div class="acts" style="margin:0"><button type="button" class="btn sm" data-act="v-edit" data-id="${E(v.id)}">${open ? '收起' : '编辑'}</button><button type="button" class="btn sm" data-act="v-ex" data-id="${E(v.id)}">探究题</button><button type="button" class="btn sm ${v.hidden ? 'primary' : ''}" data-act="v-hide" data-id="${E(v.id)}">${v.hidden ? '显示' : '隐藏'}</button></div>
+      ${open ? `<div class="vedit"><div class="row"><label class="f wide">标题<input type="text" data-sc="video" data-id="${E(v.id)}" data-k="title" value="${E(v.title)}"></label>
+        <label class="f">分类<input type="text" list="catlist" data-sc="video" data-id="${E(v.id)}" data-k="category" value="${E(v.category)}"></label>
+        <label class="f">适合年龄（岁）<input type="number" min="5" max="18" data-sc="video" data-id="${E(v.id)}" data-k="minAge" value="${v.minAge}"></label>
+        <label class="f wide">为什么推荐（显示在播放页）<textarea data-sc="video" data-id="${E(v.id)}" data-k="reason">${E(v.reason || '')}</textarea></label>
+        <label class="f wide">家长提示（可选）<input type="text" data-sc="video" data-id="${E(v.id)}" data-k="caution" value="${E(v.caution || '')}"></label></div>
+        <div class="acts" style="margin:0">${v.custom ? `<button type="button" class="btn sm danger" data-act="v-del" data-id="${E(v.id)}">删除这条</button>` : (ed ? `<button type="button" class="btn sm" data-act="v-reset" data-id="${E(v.id)}">恢复原样</button>` : '')}<a class="btn sm ghost" href="https://www.bilibili.com/video/${E(v.id)}" target="_blank" rel="noopener noreferrer">去 B 站看看</a></div></div>` : ''}
+    </div>`;
+  }).join('');
+  $('#panel').innerHTML = `<h2>🎞️ 视频清单</h2><p class="lead">在公共清单上，给 ${E(profile().name)} 加自己的视频、改说明、隐藏不想看的。改动只对 TA 生效。</p>
+  <datalist id="catlist">${cats.map(c => `<option value="${E(c)}">`).join('')}</datalist>
+  <div class="card"><h3>＋ 添加一条 B 站视频</h3>
+    <div class="acts" style="margin:0 0 10px"><input type="text" id="nv-id" placeholder="粘贴 B 站视频链接，或者 BV 号" style="flex:1 1 260px"><button type="button" class="btn" id="nv-fetch">读取视频信息</button></div>
+    <div class="row"><label class="f wide">标题<input type="text" id="nv-title"></label>
+      <label class="f">UP 主<input type="text" id="nv-channel"></label>
+      <label class="f">分类<input type="text" list="catlist" id="nv-cat" placeholder="选一个或新建"></label>
+      <label class="f">适合年龄（岁）<input type="number" id="nv-age" min="5" max="18" value="${profile().age}"></label>
+      <label class="f wide">为什么想看这条<textarea id="nv-reason" placeholder="一句话，给自己或弟弟哥哥看的"></textarea></label></div>
+    <p class="hint" style="margin-top:8px" id="nv-hint">读取失败也没关系，自己填标题就能添加。没有封面的视频会显示一个彩色块。建议添加后请家长过目。</p>
+    <div class="acts"><button type="button" class="btn primary" id="nv-add">添加到清单</button></div></div>
+  <div class="filters"><input type="text" id="vq" placeholder="搜标题、UP 主" value="${E(vFilter.q)}"><select id="vc"><option value="">全部分类</option>${cats.map(c => `<option ${c === vFilter.cat ? 'selected' : ''}>${E(c)}</option>`).join('')}</select></div>
+  <p class="hint" style="margin-bottom:8px">共 ${list.length} 条${list.length > vFilter.show ? `，先显示 ${vFilter.show} 条` : ''}</p>
+  <div id="vlist">${rows || '<p class="hint">没有匹配的视频。</p>'}</div>
+  ${list.length > vFilter.show ? '<div class="acts"><button type="button" class="btn" data-act="v-more">显示更多</button></div>' : ''}`;
+  if (openVideo) { const el = $('#v-' + CSS.escape(openVideo)); if (el) el.scrollIntoView({block: 'center'}); }
+}
+let nvCover = '', nvDur = 0, nvMid = 0;
+async function fetchNv() {
+  const id = BP.parseBvid($('#nv-id').value);
+  if (!id) { toast('没认出 BV 号，请粘贴完整链接或 BV 开头的号码'); return; }
+  $('#nv-hint').textContent = '正在读取……';
+  const info = await BP.biliInfo(id);
+  if (!info) { $('#nv-hint').textContent = '读取失败（可能网络打不开 B 站接口）。自己填标题也能添加。'; return; }
+  $('#nv-title').value = info.title; $('#nv-channel').value = info.channel;
+  nvCover = info.cover; nvDur = info.duration; nvMid = info.mid;
+  $('#nv-hint').textContent = '读取成功 ✓ 补上分类和推荐理由就能添加。';
+}
+function addVideo() {
+  const id = BP.parseBvid($('#nv-id').value), title = $('#nv-title').value.trim();
+  if (!id) { toast('请先填 B 站链接或 BV 号'); return; }
+  if (!title) { toast('请填写标题'); return; }
+  if (merged().videos.some(v => v.id === id)) { toast('这条视频已经在清单里了'); return; }
+  custom.addedVideos.push({id, title, url: 'https://www.bilibili.com/video/' + id, channel: $('#nv-channel').value.trim() || 'UP 主', channelUrl: nvMid ? 'https://space.bilibili.com/' + nvMid : '',
+    category: $('#nv-cat').value.trim() || '其他', minAge: +$('#nv-age').value || profile().age, reason: $('#nv-reason').value.trim(), caution: '', cover: nvCover, duration: nvDur});
+  nvCover = ''; nvDur = 0; nvMid = 0;
+  saveNow(); vFilter.q = id; renderVideos(); toast('已添加 ✓ 可以去「学习路线」把它放进某一关');
+}
+
+/* ---------- 乐探究 ---------- */
+function exCardFor(v) { return BP.exploreCard(v, custom); }
+function questForm(q, i) {
+  const f = (k, label, extra) => `<label class="f ${extra || ''}">${label}`;
+  return `<details class="stage" ${q._open ? 'open' : ''}><summary><span class="ic">${E(q.icon || '🔬')}</span><span class="nm">${E(q.title || '（未命名课题）')}</span><span class="cnt">${q.age || 9} 岁+</span></summary><div class="sbody">
+    <div class="row"><label class="f">图标<input type="text" data-sc="quest" data-i="${i}" data-k="icon" value="${E(q.icon || '')}" maxlength="4"></label>
+      <label class="f">课题名字<input type="text" data-sc="quest" data-i="${i}" data-k="title" value="${E(q.title || '')}"></label>
+      <label class="f">适合年龄<input type="number" min="5" max="16" data-sc="quest" data-i="${i}" data-k="age" value="${q.age || 9}"></label>
+      <label class="f wide">为什么值得做<input type="text" data-sc="quest" data-i="${i}" data-k="why" value="${E(q.why || '')}"></label>
+      <label class="f">要准备的材料（一行一个）<textarea data-sc="quest" data-i="${i}" data-k="materials">${E((q.materials || []).join('\n'))}</textarea></label>
+      <label class="f">步骤（一行一步）<textarea data-sc="quest" data-i="${i}" data-k="steps">${E((q.steps || []).join('\n'))}</textarea></label>
+      <label class="f">想一想的问题（一行一个）<textarea data-sc="quest" data-i="${i}" data-k="think">${E((q.think || []).join('\n'))}</textarea></label>
+      <label class="f">安全小提示<textarea data-sc="quest" data-i="${i}" data-k="safety">${E(q.safety || '')}</textarea></label>
+      <label class="f wide">挑战（选做）<input type="text" data-sc="quest" data-i="${i}" data-k="challenge" value="${E(q.challenge || '')}"></label></div>
+    <div class="sbar"><button type="button" class="btn sm danger" data-act="q-del" data-i="${i}">删除这个课题</button></div></div></details>`;
+}
+function renderExplore() {
+  const vids = merged().videos.filter(v => !v.hidden), cats = [...new Set(vids.map(v => v.category))];
+  if (!exVideo || !vids.some(v => v.id === exVideo)) exVideo = vids[0] ? vids[0].id : '';
+  const v = vids.filter(x => x.id === exVideo)[0];
+  let form = '<p class="hint">清单里还没有视频。</p>';
+  if (v) {
+    const c = exCardFor(v), b = c.build || {}, mine = !!custom.exploreByVideo[v.id];
+    form = `<div class="row">
+      <label class="f wide">想一想的问题（一行一个，建议 3～4 个）<textarea data-sc="ex" data-k="think" style="min-height:120px">${E(c.think.map(q => q.q).join('\n'))}</textarea></label>
+      <label class="f wide">动手做的名字<input type="text" data-sc="ex" data-k="btitle" value="${E(b.title || '')}"></label>
+      <label class="f">材料（一行一个）<textarea data-sc="ex" data-k="materials">${E((b.materials || []).join('\n'))}</textarea></label>
+      <label class="f">步骤（一行一步）<textarea data-sc="ex" data-k="steps" style="min-height:110px">${E((b.steps || []).join('\n'))}</textarea></label>
+      <label class="f wide">安全小提示<input type="text" data-sc="ex" data-k="safety" value="${E(b.safety || '')}"></label>
+      <label class="f wide">挑战（选做）<input type="text" data-sc="ex" data-k="challenge" value="${E(c.challenge || '')}"></label>
+      <label class="f wide">讲给家人听的提示<input type="text" data-sc="ex" data-k="share" value="${E(c.share || '')}"></label></div>
+      <div class="acts"><button type="button" class="btn sm" data-act="ex-preview">👀 预览这张探究卡</button>${mine ? '<button type="button" class="btn sm danger" data-act="ex-reset">恢复成默认探究题</button>' : '<span class="hint">现在显示的是按「' + E(v.category) + '」自动生成的默认题，改动后就变成自己的版本。</span>'}</div>`;
+  }
+  const qs = custom.quests.map(questForm).join('');
+  $('#panel').innerHTML = `<h2>🔬 乐探究</h2><p class="lead">看完视频后的「想一想 → 动手做 → 讲出来」。可以改某条视频的探究题，也可以给 ${E(profile().name)} 增加自己的自由探究课题。</p>
+  <div class="card"><h3>改某条视频的探究题</h3><label class="f" style="margin-bottom:12px">选择视频<select id="ex-v">${cats.map(cat => `<optgroup label="${E(cat)}">${vids.filter(x => x.category === cat).map(x => `<option value="${E(x.id)}" ${x.id === exVideo ? 'selected' : ''}>${custom.exploreByVideo[x.id] ? '✎ ' : ''}${E(x.title.slice(0, 40))}</option>`).join('')}</optgroup>`).join('')}</select></label>${form}</div>
+  <div class="card"><h3>自己的探究课题（${custom.quests.length}）</h3><p class="hint" style="margin-bottom:10px">另外还有 ${BP.QUESTS.length} 个内置课题（纸飞机、沉浮、纸桥、影子测高……）。</p>${qs}<div class="acts"><button type="button" class="btn primary" data-act="q-add">＋ 新增一个课题</button></div></div>`;
+}
+function saveExFromForm() {
+  const v = vmap()[exVideo]; if (!v) return;
+  const g = k => { const el = $(`[data-sc="ex"][data-k="${k}"]`); return el ? el.value : ''; };
+  const think = lines(g('think')).map(q => ({q}));
+  custom.exploreByVideo[v.id] = {think, build: {title: g('btitle').trim(), materials: lines(g('materials')), steps: lines(g('steps')), safety: g('safety').trim()}, challenge: g('challenge').trim(), share: g('share').trim()};
+  save();
+}
+
+/* ---------- 奖励 ---------- */
+function renderRewards() {
+  const g = BP.game(pid), bal = g.earned - g.spent, lv = BP.level(g.earned);
+  const wishes = custom.wishes.map((w, i) => `<div class="it" style="grid-template-columns:60px minmax(0,1fr) 110px auto"><input type="text" data-sc="wish" data-i="${i}" data-k="emoji" value="${E(w.emoji || '')}" maxlength="4" style="text-align:center;font-size:22px" aria-label="图标">
+    <input type="text" data-sc="wish" data-i="${i}" data-k="name" value="${E(w.name)}" aria-label="心愿"><input type="number" min="1" data-sc="wish" data-i="${i}" data-k="cost" value="${w.cost}" aria-label="需要的星星">
+    <div class="mv"><button type="button" data-act="w-up" data-i="${i}" aria-label="上移">↑</button><button type="button" data-act="w-down" data-i="${i}" aria-label="下移">↓</button><button type="button" class="x" data-act="w-del" data-i="${i}" aria-label="删除">✕</button></div></div>`).join('');
+  $('#panel').innerHTML = `<h2>🎁 奖励</h2><p class="lead">星星攒够了，可以兑换一起商量好的心愿。奖励最好是「一起做的事」和「想要的体验」，不一定是东西。</p>
+  <div class="card"><h3>${E(profile().name)} 现在：⭐ ${bal}（累计 ${g.earned}）· Lv.${lv.no} ${lv.icon} ${E(lv.name)}</h3>
+    <p class="hint" style="margin-bottom:8px">在现实里看到的好表现（坚持、认真、帮助弟弟哥哥……），可以直接给一份星星：</p>
+    <div class="acts" style="margin:0"><input type="number" id="bn-n" min="1" max="50" value="5" style="width:90px"><input type="text" id="bn-why" placeholder="为什么奖励？（例如：主动整理了实验桌）" style="flex:1 1 220px"><button type="button" class="btn primary" id="bn-go">⭐ 发星星</button></div></div>
+  <div class="card"><h3>心愿清单</h3><div class="items">${wishes}</div><div class="acts"><button type="button" class="btn primary" data-act="w-add">＋ 添加心愿</button><button type="button" class="btn" data-act="w-reset">恢复默认清单</button></div></div>
+  <div class="card"><h3>星星是怎么来的</h3><table class="rules"><tr><td>看完一条视频</td><td>+3 ⭐</td></tr><tr><td>通过一个关卡</td><td>+15 ⭐</td></tr><tr><td>完成关卡的动手任务</td><td>+10 ⭐</td></tr><tr><td>完成一次乐探究</td><td>+6 ⭐</td></tr><tr><td>乐探究里真的动手做了</td><td>+6 ⭐</td></tr><tr><td>把发现讲给家人听</td><td>+2 ⭐</td></tr><tr><td>自由探究课题（第一次完成）</td><td>+10 ⭐ 起</td></tr></table>
+    <p class="hint" style="margin-top:8px">同一条视频、同一个任务的星星只发一次，取消再勾选刷不了分。等级：${BP.LEVELS.map(l => `${l.icon}${l.name}(${l.min})`).join('　')}</p></div>`;
+}
+
+/* ---------- 备份 ---------- */
+function renderBackup() {
+  const ps = BP.profiles();
+  $('#panel').innerHTML = `<h2>💾 备份与重置</h2><p class="lead">所有数据都只存在这台设备的浏览器里。换电脑、换手机，或者清理浏览器之前，先在这里导出一份。</p>
+  <div class="card"><h3>导出 / 导入全部数据</h3><div class="acts" style="margin-top:0"><button type="button" class="btn primary" id="bk-export">导出备份文件</button><label class="btn" style="cursor:pointer">导入备份文件<input type="file" id="bk-import" accept=".json,application/json" hidden></label></div>
+    <label class="chk" style="margin-top:8px"><input type="checkbox" id="bk-replace">导入前清空这台设备上现有的数据（否则只是覆盖同名内容）</label></div>
+  <div class="card"><h3>把设置复制给另一个孩子</h3><div class="row"><label class="f">从<select id="cp-from">${ps.map(p => `<option value="${E(p.id)}" ${p.id === pid ? 'selected' : ''}>${E(p.avatar)} ${E(p.name)}</option>`).join('')}</select></label>
+    <label class="f">复制到<select id="cp-to">${ps.map(p => `<option value="${E(p.id)}" ${p.id !== pid ? 'selected' : ''}>${E(p.avatar)} ${E(p.name)}</option>`).join('')}</select></label></div>
+    <div class="acts"><label class="chk"><input type="checkbox" id="cp-path" checked>学习路线</label><label class="chk"><input type="checkbox" id="cp-vid" checked>视频清单改动</label><label class="chk"><input type="checkbox" id="cp-ex" checked>探究题和课题</label><label class="chk"><input type="checkbox" id="cp-wish">心愿清单</label></div>
+    <div class="acts"><button type="button" class="btn" id="cp-go">复制（会覆盖对方对应的内容）</button></div></div>
+  <div class="card"><h3>重置 ${E(profile().name)}</h3><p class="hint" style="margin-bottom:8px">下面的操作都需要二次确认，做了就找不回来。</p><div class="acts" style="margin-top:0">
+    <button type="button" class="btn danger" id="rs-prog">清空学习进度、星星、探究记录</button><button type="button" class="btn danger" id="rs-custom">清空自定义内容（路线、视频改动、课题）</button></div></div>
+  <div class="card"><h3>想让所有孩子共用某条视频？</h3><p class="hint">这里添加的视频只属于当前孩子。要加进公共清单，在电脑上用原项目自带的脚本：<br><code>python3 update.py add BV号 --cat 分类 --age 9 --reason "推荐理由"</code><br>它会写进 <code>data.js</code>，再重新部署网站即可。</p></div>`;
+}
+
+/* ---------- 路由 ---------- */
+function render() {
+  paintWho(); paintTabs();
+  ({profile: renderProfile, path: renderPath, videos: renderVideos, explore: renderExplore, rewards: renderRewards, backup: renderBackup})[tab]();
+}
+
+/* ---------- 事件 ---------- */
+const panel = $('#panel');
+panel.addEventListener('input', e => {
+  const el = e.target, sc = el.dataset.sc, pf = el.dataset.pf;
+  if (pf) {
+    let v = el.type === 'checkbox' ? el.checked : el.value;
+    if (pf === 'age' || pf === 'goal') v = Math.max(5, Math.min(16, +v || 10));
+    if (pf === 'goal') v = Math.max(1, Math.min(5, +el.value || 2));
+    if (pf === 'name' && !String(v).trim()) return;
+    BP.updateProfile(pid, {[pf]: v}); paintPreview(); paintWho(); flash();
+    if (pf === 'avatar') $$('[data-av]').forEach(b => b.classList.toggle('on', b.dataset.av === v));
+    return;
+  }
+  if (!sc) return;
+  const k = el.dataset.k, s = +el.dataset.s, i = +el.dataset.i;
+  const val = el.type === 'checkbox' ? el.checked : el.value;
+  if (sc === 'path') { custom.path[k] = k === 'tips' ? lines(val) : val; }
+  else if (sc === 'stage') { custom.path.stages[s][k] = val; if (k === 'name' || k === 'icon') { const d = el.closest('details'); $('.nm', d).textContent = `第 ${s + 1} 关　${custom.path.stages[s].name}`; $('.ic', d).textContent = custom.path.stages[s].icon || '⭐'; } }
+  else if (sc === 'mission') { const st = custom.path.stages[s]; st.mission = st.mission || {text: '', url: '', label: ''}; st.mission[k] = val; }
+  else if (sc === 'item') { custom.path.stages[s].items[i][k] = val; }
+  else if (sc === 'video') {
+    const id = el.dataset.id, v = vmap()[id];
+    if (v && v.custom) { const a = custom.addedVideos.filter(x => x.id === id)[0]; a[k] = k === 'minAge' ? (+val || 10) : val; }
+    else { const ed = custom.videoEdits[id] = custom.videoEdits[id] || {}; ed[k] = k === 'minAge' ? (+val || 10) : val; }
+  }
+  else if (sc === 'ex') { saveExFromForm(); return; }
+  else if (sc === 'quest') { const q = custom.quests[i]; q[k] = ['materials', 'steps', 'think'].includes(k) ? lines(val) : k === 'age' ? (+val || 9) : val; }
+  else if (sc === 'wish') { const w = custom.wishes[i]; w[k] = k === 'cost' ? Math.max(1, +val || 1) : val; }
+  save();
+});
+panel.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details.stage[data-key]')) openStages[d.dataset.key] = d.open; }, true);
+panel.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset.sc === 'stage' && el.type === 'checkbox') { /* input 事件已处理 */ }
+  if (el.id === 'ex-v') { exVideo = el.value; renderExplore(); }
+  if (el.id === 'vc') { vFilter.cat = el.value; vFilter.show = 30; renderVideos(); }
+});
+panel.addEventListener('keyup', e => { if (e.target.id === 'vq') { vFilter.q = e.target.value; vFilter.show = 30; const pos = e.target.selectionStart; renderVideos(); const q = $('#vq'); q.focus(); q.setSelectionRange(pos, pos); } });
+
+panel.addEventListener('click', e => {
+  const av = e.target.closest('[data-av]'), th = e.target.closest('[data-th]'), a = e.target.closest('[data-act]');
+  if (av) { BP.updateProfile(pid, {avatar: av.dataset.av}); renderProfile(); paintWho(); flash(); return; }
+  if (th) { BP.updateProfile(pid, {theme: th.dataset.th}); renderProfile(); flash(); return; }
+  const id = e.target.id;
+  if (id === 'pin-save') { BP.setPin($('#pin').value.trim()); try { sessionStorage.setItem('bp2-editor-ok', '1'); } catch (x) {} toast($('#pin').value.trim() ? '口令已保存' : '口令已取消'); return; }
+  if (id === 'del-kid') {
+    if (BP.profiles().length <= 1) { toast('至少要保留一个档案'); return; }
+    if (!confirm(`确定删除「${profile().name}」吗？TA 的进度、星星、探究记录和自定义内容都会消失。`)) return;
+    BP.removeProfile(pid); pid = BP.profiles()[0].id; custom = BP.getCustom(pid); render(); toast('已删除'); return;
+  }
+  if (id === 'nv-fetch') { fetchNv(); return; }
+  if (id === 'nv-add') { addVideo(); return; }
+  if (id === 'bn-go') {
+    const n = Math.max(1, Math.min(50, +$('#bn-n').value || 5)), why = $('#bn-why').value.trim() || '家长奖励';
+    const prev = BP.jget('bp2-current', null);
+    BP.setCurrent(pid);
+    BP.reward({key: 'bonus:' + BP.uid('b'), n, label: '家长奖励：' + why}, {before: s => [{icon: '🎁', title: '家长发来一份奖励！', sub: why, stars: s, big: true}]});
+    if (prev) BP.setCurrent(prev); else BP.jset('bp2-current', null);
+    renderRewards(); return;
+  }
+  if (id === 'bk-export') { dl(`bilipicks-kids-backup-${BP.ymd()}.json`, BP.exportAll()); toast('已导出'); return; }
+  if (id === 'cp-go') {
+    const from = $('#cp-from').value, to = $('#cp-to').value;
+    if (from === to) { toast('请选两个不同的孩子'); return; }
+    if (!confirm('会覆盖对方对应的内容，确定吗？')) return;
+    const src = BP.getCustom(from), dst = BP.getCustom(to);
+    if ($('#cp-path').checked) dst.path = src.path ? BP.clone(src.path) : null;
+    if ($('#cp-vid').checked) { dst.hiddenVideos = BP.clone(src.hiddenVideos); dst.videoEdits = BP.clone(src.videoEdits); dst.addedVideos = BP.clone(src.addedVideos); }
+    if ($('#cp-ex').checked) { dst.exploreByVideo = BP.clone(src.exploreByVideo); dst.quests = BP.clone(src.quests); }
+    if ($('#cp-wish').checked) dst.wishes = BP.clone(src.wishes);
+    BP.saveCustom(dst, to); if (to === pid) custom = BP.getCustom(pid);
+    toast('已复制 ✓'); return;
+  }
+  if (id === 'rs-prog') {
+    if (!confirm(`清空 ${profile().name} 的全部进度、星星和探究记录？`) || !confirm('再确认一次：这个操作无法撤销。')) return;
+    ['done', 'missions', 'game', 'explore'].forEach(n => { try { localStorage.removeItem(BP.pkey(n, pid)); } catch (x) {} });
+    toast('已清空进度'); renderBackup(); return;
+  }
+  if (id === 'rs-custom') {
+    if (!confirm(`清空 ${profile().name} 的自定义路线、视频改动和课题？`) || !confirm('再确认一次：这个操作无法撤销。')) return;
+    try { localStorage.removeItem(BP.pkey('custom', pid)); } catch (x) {}
+    custom = BP.getCustom(pid); toast('已清空自定义内容'); renderBackup(); return;
+  }
+  if (!a) return;
+  const act = a.dataset.act, s = +a.dataset.s, i = +a.dataset.i, vid = a.dataset.id;
+  const P = custom.path;
+  switch (act) {
+    case 'path-start': {
+      const bp = BP.basePath(), mode = a.dataset.mode;
+      custom.path = mode === 'full' ? bp : mode === 'five' ? Object.assign(bp, {stages: bp.stages.slice(0, 5)}) : {title: '我的学习路线', intro: '', tips: [], stages: []};
+      saveNow(); renderPath(); break;
+    }
+    case 'path-reset': if (confirm('换回公共路线？你对路线做的所有修改都会丢掉（看完的进度不受影响）。')) { custom.path = null; saveNow(); renderPath(); } break;
+    case 'st-add': P.stages.push({key: 'c' + Date.now().toString(36), icon: '⭐', name: '新的一关', age: '', goal: '', items: [], mission: {text: '', url: '', label: ''}}); openStages[P.stages[P.stages.length - 1].key] = true; saveNow(); renderPath(); break;
+    case 'st-del': if (confirm(`删除「${P.stages[s].name}」这一关？`)) { P.stages.splice(s, 1); saveNow(); renderPath(); } break;
+    case 'st-up': move(P.stages, s, -1); saveNow(); renderPath(); break;
+    case 'st-down': move(P.stages, s, 1); saveNow(); renderPath(); break;
+    case 'it-up': move(P.stages[s].items, i, -1); saveNow(); renderPath(); break;
+    case 'it-down': move(P.stages[s].items, i, 1); saveNow(); renderPath(); break;
+    case 'it-del': P.stages[s].items.splice(i, 1); saveNow(); renderPath(); break;
+    case 'it-add': openPicker(s); break;
+    case 'v-edit': openVideo = openVideo === vid ? '' : vid; renderVideos(); break;
+    case 'v-hide': if (custom.hiddenVideos[vid]) delete custom.hiddenVideos[vid]; else custom.hiddenVideos[vid] = true; saveNow(); renderVideos(); break;
+    case 'v-del': if (confirm('删除这条自己加的视频？')) { custom.addedVideos = custom.addedVideos.filter(x => x.id !== vid); delete custom.hiddenVideos[vid]; openVideo = ''; saveNow(); renderVideos(); } break;
+    case 'v-reset': delete custom.videoEdits[vid]; saveNow(); renderVideos(); break;
+    case 'v-more': vFilter.show += 30; renderVideos(); break;
+    case 'v-ex': exVideo = vid; tab = 'explore'; history.replaceState(null, '', '#explore'); render(); window.scrollTo(0, 0); break;
+    case 'ex-reset': delete custom.exploreByVideo[exVideo]; saveNow(); renderExplore(); break;
+    case 'ex-preview': { const v = vmap()[exVideo]; if (v) BP.openExplore({preview: true, kind: 'video', ref: v.id, title: v.title, card: exCardFor(v), fresh: true}); break; }
+    case 'q-add': custom.quests.push({id: 'qc' + Date.now().toString(36), icon: '🔬', title: '新的探究课题', age: profile().age, why: '', materials: [], steps: [], think: [], safety: '', challenge: ''}); custom.quests[custom.quests.length - 1]._open = true; saveNow(); renderExplore(); break;
+    case 'q-del': if (confirm('删除这个课题？')) { custom.quests.splice(i, 1); saveNow(); renderExplore(); } break;
+    case 'w-add': custom.wishes.push({id: BP.uid('w'), emoji: '🎁', name: '新的心愿', cost: 50}); saveNow(); renderRewards(); break;
+    case 'w-del': custom.wishes.splice(i, 1); saveNow(); renderRewards(); break;
+    case 'w-up': move(custom.wishes, i, -1); saveNow(); renderRewards(); break;
+    case 'w-down': move(custom.wishes, i, 1); saveNow(); renderRewards(); break;
+    case 'w-reset': if (confirm('恢复成默认心愿清单？')) { custom.wishes = BP.defaultWishes(); saveNow(); renderRewards(); } break;
+  }
+});
+panel.addEventListener('change', e => {
+  if (e.target.id === 'bk-import' && e.target.files[0]) {
+    const f = e.target.files[0], rd = new FileReader();
+    rd.onload = () => {
+      let obj; try { obj = JSON.parse(rd.result); } catch (x) { toast('文件打不开，不是有效的 JSON'); return; }
+      const rep = $('#bk-replace').checked;
+      if (!confirm(rep ? '会先清空这台设备上的现有数据，再导入。确定吗？' : '导入后会覆盖同名内容。确定吗？')) return;
+      const r = BP.importAll(obj, rep);
+      if (!r.ok) { toast(r.msg); return; }
+      toast(`导入成功（${r.n} 项），正在刷新……`); setTimeout(() => location.reload(), 900);
+    };
+    rd.readAsText(f);
+  }
+});
+
+/* ---------- 启动 ---------- */
+{
+  const h = location.hash.slice(1).split('/');
+  if (TABS.some(t => t[0] === h[0])) tab = h[0];
+  if (h[0] === 'video' && h[1]) {
+    const id = h[1];
+    if (vmap()[id]) { tab = 'videos'; openVideo = id; vFilter.q = ''; vFilter.show = 400; }
+  }
+  render();
+}
+</script>
+</body>
+</html>

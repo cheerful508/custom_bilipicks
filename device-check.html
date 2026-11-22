@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>设备自检 · 乐学版</title>
+<style>
+body{margin:0;padding:24px;font:18px/1.7 system-ui,"PingFang SC","Microsoft YaHei",sans-serif;background:#0b1220;color:#eef3fb}
+h1{margin:0 0 6px;font-size:26px}
+.t{color:#9aa7ba;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;max-width:900px}
+td{padding:8px 12px;border-bottom:1px solid #26334a;vertical-align:top}
+td:first-child{width:46%;color:#c3cede}
+.ok{color:#35c986;font-weight:800}.no{color:#ff7487;font-weight:800}.mid{color:#f0b24a;font-weight:800}
+.box{margin:18px 0;padding:14px 16px;border-radius:14px;background:#162033;max-width:900px}
+a.b{display:inline-block;margin:6px 10px 6px 0;padding:12px 22px;border-radius:30px;background:#2f86e0;color:#fff;text-decoration:none;font-weight:800}
+iframe{width:480px;max-width:100%;height:270px;border:0;background:#000;border-radius:10px}
+</style>
+</head>
+<body>
+<h1>设备自检</h1>
+<p class="t">把这一页的截图或文字发给我，我就知道这台设备能不能跑乐学版，哪里要调整。</p>
+<table id="tb"></table>
+<div class="box"><b>B 站播放器测试</b>（应该能看到 B 站播放器的画面；黑屏或报错说明这台设备打不开站外播放器）<br><br>
+<iframe id="pl" allow="autoplay; fullscreen; encrypted-media" allowfullscreen src="https://player.bilibili.com/player.html?bvid=BV1SH4y1A7DA&autoplay=0&danmaku=0"></iframe></div>
+<div class="box"><b>触屏测试</b>：用手指在下面的方块上点几下，看数字变不变。<br><br>
+<button id="tap" style="font-size:28px;padding:18px 40px;border-radius:16px;border:0;background:#0f9457;color:#fff">点我：0</button>
+<br><br><span id="tk" style="color:#9aa7ba">按键：（先点一下页面，再用遥控器按 ◀ ▶ ▲ ▼ OK 和返回键，这里会显示收到了什么）</span></div>
+<p><a class="b" href="tv.html">打开大屏版</a><a class="b" href="index.html">打开网页版</a><a class="b" href="editor.html">打开编辑器</a></p>
+<script>
+var rows=[];
+function add(k,v,c){rows.push('<tr><td>'+k+'</td><td class="'+(c||'')+'">'+v+'</td></tr>');}
+function css(p,v){try{return !!(window.CSS&&CSS.supports&&CSS.supports(p,v));}catch(e){return false;}}
+function yn(b){return b?'支持 ✓':'不支持（会用兜底写法）';}
+add('浏览器标识 (UA)',navigator.userAgent);
+var m=navigator.userAgent.match(/(?:Chrome|Chromium)\/(\d+)/);
+add('Chrome 内核版本',m?m[1]:'不是 Chrome 内核或识别不出',m?(+m[1]>=84?'ok':(+m[1]>=66?'mid':'no')):'mid');
+add('屏幕分辨率（CSS 像素）',screen.width+' × '+screen.height+'；窗口 '+innerWidth+' × '+innerHeight+'；像素比 '+(window.devicePixelRatio||1));
+add('触屏点数',(navigator.maxTouchPoints||0)+(('ontouchstart' in window)?'；有 touch 事件':'；无 touch 事件'),(navigator.maxTouchPoints>0||('ontouchstart' in window))?'ok':'mid');
+add('页面地址',location.href);
+add('能保存数据 (localStorage)',(function(){try{localStorage.setItem('bp2-check','1');localStorage.removeItem('bp2-check');return '可以 ✓';}catch(e){return '不行：'+e.message;}})(),'ok');
+add('CSS aspect-ratio',yn(css('aspect-ratio','1/1')),css('aspect-ratio','1/1')?'ok':'mid');
+add('CSS inset',yn(css('inset','0')),css('inset','0')?'ok':'mid');
+add('CSS color-mix',yn(css('color','color-mix(in srgb,red,blue)')),css('color','color-mix(in srgb,red,blue)')?'ok':'mid');
+add('CSS min()',yn(css('width','min(1px,2px)')),css('width','min(1px,2px)')?'ok':'mid');
+add('CSS zoom（庆祝弹窗放大用）',yn(css('zoom','1.2')),css('zoom','1.2')?'ok':'mid');
+add('IntersectionObserver',yn('IntersectionObserver' in window),('IntersectionObserver' in window)?'ok':'mid');
+add('音频 (AudioContext)',yn(window.AudioContext||window.webkitAudioContext),(window.AudioContext||window.webkitAudioContext)?'ok':'mid');
+add('全屏 API',yn(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen),'ok');
+add('剪贴板 (复制探究记录)',yn(navigator.clipboard&&navigator.clipboard.writeText),'ok');
+add('时间',new Date().toString());
+document.getElementById('tb').innerHTML=rows.join('');
+var n=0;document.getElementById('tap').onclick=function(){n++;this.textContent='点我：'+n;};
+var tk=document.getElementById('tk'),armed=false;
+function arm(){if(armed)return;armed=true;try{history.pushState({c:1},'');}catch(e){}}
+document.addEventListener('keydown',function(e){arm();tk.textContent='按键：'+e.key+'（code '+e.code+'，keyCode '+e.keyCode+'）';});
+document.addEventListener('pointerdown',arm);
+window.addEventListener('popstate',function(){tk.textContent='按键：收到「返回」（浏览器后退事件）✓ 大屏版可以接管';try{history.pushState({c:1},'');}catch(e){}});
+</script>
+</body>
+</html>
