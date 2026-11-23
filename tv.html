@@ -137,6 +137,7 @@ h1,h2,h3,p{margin:0}
 .mt{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(150deg,#2b3a55,#1c2840)}
 .mt .ic{font-size:2rem;line-height:1;margin-bottom:.35rem}
 .mt .nm{font-size:1rem;font-weight:800}
+.mt.subj.on{background:linear-gradient(150deg,#3d5a8a,#264a7c);box-shadow:inset 0 0 0 .16rem #7fd1ff}
 .panel-box{width:46rem;max-width:92vw;max-height:88vh;display:flex;flex-direction:column}
 .plist{overflow-y:auto;margin-top:.8rem;padding:.4rem .3rem 0;-webkit-overflow-scrolling:touch}
 .pitem{display:flex;align-items:center;margin-bottom:.7rem;border-radius:1rem}
@@ -216,6 +217,7 @@ body .bp-cheer{width:380px;max-width:calc(100% / var(--mz,1))}
 <div class="toast" id="toast"></div>
 
 <script src="data.js"></script>
+<script src="profiles-data.js"></script>
 <script src="core.js"></script>
 <script>
 'use strict';
@@ -275,7 +277,7 @@ function prepare(data) {
   D.videos.forEach(function (v) { byId[v.id] = v; });
   var path = D.path || {stages: []};
   stages = path.stages.map(function (st, si) {
-    var s = {no: si + 1, key: st.key || ('s' + (si + 1)), name: st.name, icon: st.icon || '', age: st.age || '', later: !!st.later, hue: HUES[si % 9], hue2: HUES2[si % 9], vids: []};
+    var s = {no: si + 1, key: st.key || ('s' + (si + 1)), name: st.name, icon: st.icon || '', age: st.age || '', later: !!st.later, subject: st.subject || '未分类', hue: HUES[si % 9], hue2: HUES2[si % 9], vids: []};
     st.items.forEach(function (it) {
       var v = byId[it.id];
       if (!v || v.dead) return;
@@ -285,10 +287,15 @@ function prepare(data) {
     });
     return s;
   });
+  SUBJECTS = BP.subjectsOf(D);
 }
 var stageOf = function (v) { return v && pathInfo[v.id] ? stages[pathInfo[v.id].stage - 1] : null; };
 var doneCount = function (list) { return list.filter(function (v) { return isDone(v.id); }).length; };
-var nextUndone = function () { return pathItems.filter(function (v) { return !isDone(v.id); })[0] || pathItems[0]; };
+var nextUndone = function (list) { list = list || pathItems; return list.filter(function (v) { return !isDone(v.id); })[0] || list[0]; };
+var curSubject = '全部';
+var SUBJECTS = [];
+var stagesIn = function (subj) { return subj === '全部' ? stages : stages.filter(function (s) { return s.subject === subj; }); };
+var itemsIn = function (subj) { return stagesIn(subj).reduce(function (a, s) { return a.concat(s.vids); }, []); };
 
 // ---------- 顶栏 ----------
 function refreshTop() {
@@ -480,18 +487,26 @@ function cardHTML(v, i, ctxPath) {
 }
 
 function renderHome() {
-  var nu = nextUndone();
-  var allDone = pathItems.length && doneCount(pathItems) === pathItems.length;
+  var scopeStages = stagesIn(curSubject), scopeItems = itemsIn(curSubject);
+  var nu = nextUndone(scopeItems);
+  var allDone = scopeItems.length && doneCount(scopeItems) === scopeItems.length;
   var html = '<section class="sec"><div class="metro" id="metro">';
+  if (SUBJECTS.length > 1) {
+    ['全部'].concat(SUBJECTS).forEach(function (s) {
+      html += '<div class="tile mt subj' + (s === curSubject ? ' on' : '') + '" data-act="subject" data-subject="' + esc(s) + '"><span class="ic">📚</span><span class="nm">' + esc(s) + '</span></div>';
+    });
+  }
   if (nu) {
     var nst = stageOf(nu), npi = pathInfo[nu.id];
     html += '<div class="tile big" data-act="continue">' + (nu.cover ? '<img data-src="' + esc(nu.cover) + '" alt="" referrerpolicy="no-referrer">' : '') +
-      '<div class="shade"></div><span class="playbtn">▶</span><div class="txt"><span class="lbl">' + (allDone ? '路线全部看完了，再看一遍' : doneCount(pathItems) ? '继续闯关' : '从第 1 关开始') + '</span>' +
+      '<div class="shade"></div><span class="playbtn">▶</span><div class="txt"><span class="lbl">' + (allDone ? '路线全部看完了，再看一遍' : doneCount(scopeItems) ? '继续闯关' : '从第 1 关开始') + '</span>' +
       '<h2>' + esc(npi.note) + '</h2><p>第 ' + nst.no + ' 关 ' + esc(nst.name) + ' · 第 ' + npi.step + ' 步 · ' + esc(lenLabel(nu)) + '</p></div></div>';
-  } else {
+  } else if (scopeStages.length) {
     html += '<div class="tile big" data-act="random"><div class="shade"></div><span class="playbtn">🎲</span><div class="txt"><span class="lbl">还没有学习路线</span><h2>先随便看看</h2><p>在编辑器里添加属于自己的路线</p></div></div>';
+  } else {
+    html += '<div class="tile big" data-act="random"><div class="shade"></div><span class="playbtn">🎲</span><div class="txt"><span class="lbl">这个学科还没有关卡</span><h2>先随便看看</h2><p>去编辑器里给这个学科添加视频吧</p></div></div>';
   }
-  stages.forEach(function (st) {
+  scopeStages.forEach(function (st) {
     var n = doneCount(st.vids), all = st.vids.length;
     html += '<div class="tile stage' + (n === all && all ? ' all-done' : '') + (st.later ? ' later' : '') + '" data-stage="' + st.no + '" style="--h:' + st.hue + ';--h2:' + st.hue2 + '">' +
       '<span class="no">第 ' + st.no + ' 关</span><div class="ic">' + esc(st.icon) + '</div><div class="nm">' + esc(st.name) + '</div>' +
@@ -504,7 +519,7 @@ function renderHome() {
   html += '</div></section>';
 
   var lists = [];
-  stages.forEach(function (st) {
+  scopeStages.forEach(function (st) {
     if (st.vids.length) lists.push({name: '第 ' + st.no + ' 关 · ' + st.name, sub: st.age, hue: st.hue, list: st.vids, path: true});
   });
   D.categories.forEach(function (c, ci) {
@@ -617,7 +632,8 @@ function activate(r, c) {
     if (act === 'me') { openMe(); return; }
     if (act === 'quests') { openQuests(); return; }
     if (act === 'random') { playRandom(); return; }
-    if (act === 'continue') { var v = nextUndone(); play(pathItems, pathItems.indexOf(v), '成长路线', true); return; }
+    if (act === 'subject') { curSubject = el.getAttribute('data-subject'); renderHome(); return; }
+    if (act === 'continue') { var scoped = itemsIn(curSubject), v = nextUndone(scoped); play(pathItems, pathItems.indexOf(v), '成长路线', true); return; }
     var st = stages[+el.getAttribute('data-stage') - 1];
     var first = st.vids.filter(function (x) { return !isDone(x.id); })[0] || st.vids[0];
     if (first) play(pathItems, pathItems.indexOf(first), '成长路线', true);
@@ -803,10 +819,9 @@ function playerKey(k) {
     else if (k === 'up' || k === 'back' || k === 'menu') { closeStrip(); wake(); }
     return;
   }
-  if (seekMode() && (k === 'left' || k === 'right')) {   // 网页收到了 ◀ ▶（焦点不在播放器上）：把焦点交给播放器，下一次按键才是快退 / 快进
+  if (seekMode() && (k === 'left' || k === 'right')) {   // 让播放器 iframe 保持焦点，并把信号交给安卓原生壳注入真实方向键
     focusPlayerFrame();
-    toast('再按一次 ◀ ▶ ＝ 快退 / 快进', 1800);
-    return;
+    return k === 'left' ? 'seek-' : 'seek+';
   }
   if (k === 'prev' || k === 'left') { go(-1); return; }
   if (k === 'next' || k === 'right') { go(1); return; }

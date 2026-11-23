@@ -14,7 +14,15 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function p2(n) { return (n < 10 ? '0' : '') + n; }
 function ymd(d) { d = d || new Date(); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
 function uid(p) { return (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-function jget(k, f) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch (e) { return f; } }
+var PUBLISHED = (global.BP_PUBLISHED && global.BP_PUBLISHED.items) || {};
+function jget(k, f) {
+  try {
+    var raw = localStorage.getItem(k);
+    if (raw == null && PUBLISHED[k] != null) raw = PUBLISHED[k];
+    var v = JSON.parse(raw);
+    return v == null ? f : v;
+  } catch (e) { return f; }
+}
 function jset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 BP.clone = clone; BP.esc = esc; BP.ymd = ymd; BP.uid = uid; BP.jget = jget; BP.jset = jset;
 BP.on = function (ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); };
@@ -114,9 +122,19 @@ BP.getCustom = function (pid) {
 BP.saveCustom = function (c, pid) { BP.save('custom', c, pid); BP.emit('custom'); };
 
 function ensureKeys(path) {
-  (path.stages || []).forEach(function (s, i) { if (!s.key) s.key = 's' + (i + 1); s.items = s.items || []; });
+  (path.stages || []).forEach(function (s, i) { if (!s.key) s.key = 's' + (i + 1); s.items = s.items || []; s.subject = s.subject || '未分类'; });
   return path;
 }
+BP.subjectsOf = function (D) {
+  var order = D.categories || [], seen = {}, out = [];
+  (D.path.stages || []).forEach(function (s) { if (!seen[s.subject]) { seen[s.subject] = true; out.push(s.subject); } });
+  out.sort(function (a, b) {
+    var ia = order.indexOf(a), ib = order.indexOf(b);
+    if (ia < 0) ia = order.length; if (ib < 0) ib = order.length;
+    return ia - ib;
+  });
+  return out;
+};
 var DATA0 = (typeof DATA !== 'undefined') ? DATA : {videos: [], categories: [], path: {title: '成长路线', intro: '', tips: [], stages: []}};
 BP.base = clone(DATA0);                       // 公共清单的原样副本，永远不改
 BP.basePath = function () { return ensureKeys(clone(BP.base.path || {title: '成长路线', intro: '', tips: [], stages: []})); };
@@ -727,6 +745,52 @@ BP.importAll = function (obj, replace) {
     for (var key in obj.items) if (key.indexOf('bp2-') === 0 && typeof obj.items[key] === 'string') { localStorage.setItem(key, obj.items[key]); n++; }
     return {ok: true, n: n};
   } catch (e) { return {ok: false, msg: '写入失败：' + e.message}; }
+};
+
+/* ---------- 一键发布到线上（把本机数据推到 GitHub，Cloudflare Pages 自动重新部署） ---------- */
+BP.GH_REPO = {owner: 'cheerful508', repo: 'custom_bilipicks', branch: 'main', path: 'profiles-data.js'};
+function b64encode(str) {
+  var bytes = encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (_, p) { return String.fromCharCode(parseInt(p, 16)); });
+  return global.btoa(bytes);
+}
+BP.publish = function (token) {
+  var R = BP.GH_REPO;
+  var api = 'https://api.github.com/repos/' + R.owner + '/' + R.repo + '/contents/' + R.path;
+  var headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'};
+  var content = b64encode('window.BP_PUBLISHED = ' + JSON.stringify(BP.exportAll()) + ';\n');
+  function readJson(r) { return r.json().catch(function () { return {}; }); }
+  function getSha() {
+    return fetch(api + '?ref=' + R.branch, {headers: headers}).then(function (r) {
+      if (r.status === 404) return null;
+      if (!r.ok) return readJson(r).then(function (j) { return Promise.reject({status: r.status, msg: j.message}); });
+      return readJson(r).then(function (j) { return j.sha; });
+    });
+  }
+  function put(sha) {
+    var body = {message: '发布：' + ymd() + ' ' + new Date().toTimeString().slice(0, 8), content: content, branch: R.branch};
+    if (sha) body.sha = sha;
+    return fetch(api, {method: 'PUT', headers: headers, body: JSON.stringify(body)}).then(function (r) {
+      if (r.ok) return {ok: true};
+      return readJson(r).then(function (j) { return Promise.reject({status: r.status, msg: j.message}); });
+    });
+  }
+  function attempt(retrying) {
+    return getSha().then(put).catch(function (e) {
+      if (e && e.status === 409 && !retrying) return attempt(true);
+      return Promise.reject(e);
+    });
+  }
+  return attempt(false).then(function (res) {
+    jset('bp2-last-published', new Date().toISOString());
+    return res;
+  }).catch(function (e) {
+    var status = e && e.status, msg = e && e.msg;
+    if (status === 401) return {ok: false, msg: '令牌不对或已过期，去 GitHub 重新生成一个'};
+    if (status === 403) return {ok: false, msg: '这个令牌没有这个仓库的写入权限'};
+    if (status === 409) return {ok: false, msg: '版本有冲突，请再点一次发布'};
+    if (status) return {ok: false, msg: '发布失败（' + status + '）' + (msg ? '：' + msg : '')};
+    return {ok: false, msg: '网络错误，请检查网络后重试'};
+  });
 };
 
 /* ---------- 从 B 站读取视频信息（JSONP，和原项目取封面是同一个办法） ---------- */
