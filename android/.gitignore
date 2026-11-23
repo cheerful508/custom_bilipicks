@@ -1,0 +1,7 @@
+build/
+*.apk
+!release/*.apk
+*.idsig
+*.keystore
+*.jks
+.site_dir
