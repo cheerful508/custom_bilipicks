@@ -113,7 +113,9 @@ BP.getCustom = function (pid) {
   c.hiddenVideos = c.hiddenVideos || {};
   c.videoEdits = c.videoEdits || {};
   c.addedVideos = c.addedVideos || [];
-  c.path = c.path || null;
+  if (c.tracks === undefined) c.tracks = c.path ? [c.path] : null; // 一次性兼容旧的单路线数据
+  delete c.path;
+  c.subjects = c.subjects || null;
   c.exploreByVideo = c.exploreByVideo || {};
   c.quests = c.quests || [];
   if (!c.wishes) c.wishes = BP.defaultWishes();
@@ -121,27 +123,19 @@ BP.getCustom = function (pid) {
 };
 BP.saveCustom = function (c, pid) { BP.save('custom', c, pid); BP.emit('custom'); };
 
-function ensureKeys(path) {
-  (path.stages || []).forEach(function (s, i) { if (!s.key) s.key = 's' + (i + 1); s.items = s.items || []; s.subject = s.subject || '未分类'; });
-  return path;
+function ensureKeys(track) {
+  (track.stages || []).forEach(function (s, i) { if (!s.key) s.key = 's' + (i + 1); s.items = s.items || []; });
+  return track;
 }
-BP.subjectsOf = function (D) {
-  var order = D.categories || [], seen = {}, out = [];
-  (D.path.stages || []).forEach(function (s) { if (!seen[s.subject]) { seen[s.subject] = true; out.push(s.subject); } });
-  out.sort(function (a, b) {
-    var ia = order.indexOf(a), ib = order.indexOf(b);
-    if (ia < 0) ia = order.length; if (ib < 0) ib = order.length;
-    return ia - ib;
-  });
-  return out;
-};
-var DATA0 = (typeof DATA !== 'undefined') ? DATA : {videos: [], categories: [], path: {title: '成长路线', intro: '', tips: [], stages: []}};
+var DATA0 = (typeof DATA !== 'undefined') ? DATA : {videos: [], categories: [], tracks: [], subjects: []};
 BP.base = clone(DATA0);                       // 公共清单的原样副本，永远不改
-BP.basePath = function () { return ensureKeys(clone(BP.base.path || {title: '成长路线', intro: '', tips: [], stages: []})); };
+BP.baseTracks = function () { return (BP.base.tracks || []).map(function (t) { return ensureKeys(clone(t)); }); };
+BP.baseSubjects = function () { return clone(BP.base.subjects || []); };
 
 BP.buildData = function (base, custom) {
   var D = clone(base);
-  D.path = ensureKeys(D.path || {title: '成长路线', intro: '', tips: [], stages: []});
+  D.tracks = (custom.tracks || base.tracks || []).map(function (t) { return ensureKeys(clone(t)); });
+  D.subjects = clone(custom.subjects || base.subjects || []);
   var edits = custom.videoEdits || {}, hidden = custom.hiddenVideos || {};
   var have = {};
   D.videos.forEach(function (v) {
@@ -157,12 +151,11 @@ BP.buildData = function (base, custom) {
   D.videos.forEach(function (v) { if (hidden[v.id]) { v.hidden = true; v.dead = true; } });
   D.categories = (D.categories || []).slice();
   D.videos.forEach(function (v) { if (v.category && D.categories.indexOf(v.category) < 0) D.categories.push(v.category); });
-  if (custom.path) D.path = ensureKeys(clone(custom.path));
   return D;
 };
 BP.applyTo = function (D, pid) {
   var m = BP.buildData(BP.base, BP.getCustom(pid));
-  D.videos = m.videos; D.categories = m.categories; D.path = m.path;
+  D.videos = m.videos; D.categories = m.categories; D.tracks = m.tracks; D.subjects = m.subjects;
   return D;
 };
 BP.applyTo(DATA0);

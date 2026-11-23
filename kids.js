@@ -175,7 +175,7 @@ function questCardHTML(q) {
 function renderExplore() {
   var recs = BP.records().slice().sort(function (a, b) { return (b.u || b.t) - (a.u || a.t); });
   var quests = BP.allQuests(), age = BP.profile().age || 10;
-  var doneVideos = (typeof pathItems !== 'undefined' ? DATA.videos : []).filter(function (v) { return !v.dead && isDone(v.id) && !(BP.findRecord('video', v.id) || {}).done; }).slice(0, 6);
+  var doneVideos = DATA.videos.filter(function (v) { return !v.dead && isDone(v.id) && !(BP.findRecord('video', v.id) || {}).done; }).slice(0, 6);
   var html = '<h1>🔬 乐探究</h1><p class="lead">看完视频不是终点。<b>想一想、动手做、讲出来</b>，才算真的学会。每次探究都有星星奖励，真的动手做了奖励更多。</p>' +
     '<div class="filters"><button type="button" class="chip ' + (exploreTab === 'quests' ? 'on' : '') + '" data-xt="quests">探究课题库</button>' +
     '<button type="button" class="chip ' + (exploreTab === 'journal' ? 'on' : '') + '" data-xt="journal">我的探究本（' + recs.length + '）</button></div>';
@@ -214,7 +214,7 @@ function openQuest(id) {
 /* ---------- 初始化：事件 ---------- */
 function kidsInit() {
   BP.hooks.toast = toast;
-  BP.hooks.stagesCleared = function () { return stages.filter(function (s) { return s.vids.length && doneCount(s.vids) === s.vids.length; }).length; };
+  BP.hooks.stagesCleared = function () { return TRACKS.reduce(function (n, t) { return n + t.stages.filter(function (s) { return s.vids.length && doneCount(s.vids) === s.vids.length; }).length; }, 0); };
   var menu = document.getElementById('pmenu'), btn = document.getElementById('btn-profile');
   function closeMenu() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
   btn.addEventListener('click', function (e) {

@@ -271,31 +271,33 @@ function tick() {
 function modalOpen() { return !!document.querySelector('.bp-modal'); }
 
 // ---------- 数据（公共清单 + 这个孩子自己的修改，已由 core.js 合并进 DATA） ----------
-var D, byId = {}, stages = [], pathItems = [], pathInfo = {};
+var D, byId = {}, TRACKS = [], trackById = {}, curTrackId = '';
 function prepare(data) {
   D = data;
   D.videos.forEach(function (v) { byId[v.id] = v; });
-  var path = D.path || {stages: []};
-  stages = path.stages.map(function (st, si) {
-    var s = {no: si + 1, key: st.key || ('s' + (si + 1)), name: st.name, icon: st.icon || '', age: st.age || '', later: !!st.later, subject: st.subject || '未分类', hue: HUES[si % 9], hue2: HUES2[si % 9], vids: []};
-    st.items.forEach(function (it) {
-      var v = byId[it.id];
-      if (!v || v.dead) return;
-      s.vids.push(v);
-      pathInfo[v.id] = {stage: s.no, step: s.vids.length, note: it.note || v.title};
-      pathItems.push(v);
+  TRACKS = (D.tracks || []).map(function (t) {
+    var pathInfo = {}, pathItems = [];
+    var stages = (t.stages || []).map(function (st, si) {
+      var s = {no: si + 1, key: st.key || ('s' + (si + 1)), name: st.name, icon: st.icon || '', age: st.age || '', later: !!st.later, hue: HUES[si % 9], hue2: HUES2[si % 9], vids: []};
+      (st.items || []).forEach(function (it) {
+        var v = byId[it.id];
+        if (!v || v.dead) return;
+        s.vids.push(v);
+        pathInfo[v.id] = {stage: s.no, step: s.vids.length, note: it.note || v.title};
+        pathItems.push(v);
+      });
+      return s;
     });
-    return s;
+    return {id: t.id, icon: t.icon || '', title: t.title || '', intro: t.intro || '', stages: stages, pathInfo: pathInfo, pathItems: pathItems};
   });
-  SUBJECTS = BP.subjectsOf(D);
+  trackById = {};
+  TRACKS.forEach(function (t) { trackById[t.id] = t; });
+  curTrackId = TRACKS.length ? TRACKS[0].id : '';
 }
-var stageOf = function (v) { return v && pathInfo[v.id] ? stages[pathInfo[v.id].stage - 1] : null; };
+function curTrack() { return trackById[curTrackId] || TRACKS[0] || {id: '', icon: '', title: '', intro: '', stages: [], pathInfo: {}, pathItems: []}; }
+var stageOf = function (v) { var t = curTrack(); return v && t.pathInfo[v.id] ? t.stages[t.pathInfo[v.id].stage - 1] : null; };
 var doneCount = function (list) { return list.filter(function (v) { return isDone(v.id); }).length; };
-var nextUndone = function (list) { list = list || pathItems; return list.filter(function (v) { return !isDone(v.id); })[0] || list[0]; };
-var curSubject = '全部';
-var SUBJECTS = [];
-var stagesIn = function (subj) { return subj === '全部' ? stages : stages.filter(function (s) { return s.subject === subj; }); };
-var itemsIn = function (subj) { return stagesIn(subj).reduce(function (a, s) { return a.concat(s.vids); }, []); };
+var nextUndone = function (list) { list = list || curTrack().pathItems; return list.filter(function (v) { return !isDone(v.id); })[0] || list[0]; };
 
 // ---------- 顶栏 ----------
 function refreshTop() {
@@ -303,9 +305,10 @@ function refreshTop() {
   $('#av').textContent = p.avatar;
   $('#av').style.boxShadow = '0 0 0 .2rem ' + p.theme;
   $('#nm').textContent = p.name + '的学习站';
-  $('#sub').textContent = (D && D.path && D.path.title ? D.path.title : '');
+  $('#sub').textContent = curTrack().title || '';
   $('#stars').innerHTML = 'Lv.' + lv.no + ' ' + lv.icon + '　⭐ <b>' + BP.stars() + '</b>　🔥 ' + BP.streak(g);
-  if (pathItems.length) $('#prog').innerHTML = '已看 <b>' + doneCount(pathItems) + '</b> / ' + pathItems.length;
+  var pi = curTrack().pathItems;
+  if (pi.length) $('#prog').innerHTML = '已看 <b>' + doneCount(pi) + '</b> / ' + pi.length;
   else $('#prog').textContent = '';
 }
 
@@ -349,7 +352,11 @@ window.addEventListener('popstate', function () {
   if (ignorePop > 0) { ignorePop--; return; }     // 我们自己 history.back() 引起的
   if (navDepth > 0) navDepth--;                     // 用户按了返回键，浏览器已经弹掉我们压的那一层
   if (modalOpen()) { closeTopModal(); navPush('modal'); return; }   // 先关弹窗，历史补回一层
-  if (PN) { if (PN.closable) { PN = null; $('#panel').hidden = true; $('#panel').innerHTML = ''; } else navPush('panel'); return; }
+  if (PN) {
+    if (PN.parent) { PN = PN.parent; renderPanel(); navPush('panel'); return; }
+    if (PN.closable) { PN = null; $('#panel').hidden = true; $('#panel').innerHTML = ''; } else navPush('panel');
+    return;
+  }
   if (P) {
     if (strip.open) { closeStrip(); wake(); navPush('player'); return; }
     leavePlayer(true);
@@ -409,7 +416,7 @@ function panelFocus(i) {
   if (el.scrollIntoView) { try { el.scrollIntoView({block: 'nearest'}); } catch (e) { el.scrollIntoView(false); } }
 }
 function panelKey(k) {
-  if (k === 'back' || k === 'menu') { if (PN.closable) closePanel(); return; }
+  if (k === 'back' || k === 'menu') { if (PN.parent) { PN = PN.parent; renderPanel(); } else if (PN.closable) closePanel(); return; }
   if (k === 'up' || k === 'left') panelFocus(PN.idx - 1);
   else if (k === 'down' || k === 'right') panelFocus(PN.idx + 1);
   else if (k === 'ok') { var it = PN.items[PN.idx]; if (it && it.act) it.act(); }
@@ -478,12 +485,35 @@ function openQuests() {
       act: function () { closePanel(); BP.openExplore({kind: 'quest', ref: q.id, title: q.title, card: BP.questCard(q), fresh: n > 0, onClose: refreshTop}); }};
   })});
 }
+function openSubjectGroups(subj, parentPanel) {
+  var groups = subj.groups || [];
+  var items = groups.map(function (g) {
+    var vids = (g.videoIds || []).map(function (id) { return byId[id]; }).filter(function (v) { return v && !v.dead; });
+    return {html: '<span class="pav">📁</span><span class="px"><b>' + esc(g.name) + '</b><small>' + vids.length + ' 个视频' + (vids.length ? '，' + doneCount(vids) + ' 个看过' : '') + '</small></span>',
+      act: function () {
+        if (!vids.length) { toast('这个目录还没有视频，去编辑器里添加'); return; }
+        closePanel(); play(vids, 0, subj.name + ' · ' + g.name, false);
+      }};
+  });
+  if (!items.length) items.push({html: '<span class="px"><b>还没有目录</b><small>去编辑器里给「' + esc(subj.name) + '」添加年级或知识点</small></span>', act: function () {}});
+  openPanel({title: esc(subj.icon || '📚') + ' ' + esc(subj.name), closable: true, parent: parentPanel, items: items});
+}
+function openSubjects() {
+  var subjects = D.subjects || [];
+  var panel = {title: '📚 学科模式', closable: true, items: subjects.map(function (s) {
+    var groups = s.groups || [];
+    return {html: '<span class="pav">' + esc(s.icon || '📚') + '</span><span class="px"><b>' + esc(s.name) + '</b><small>' + groups.length + ' 个目录</small></span>',
+      act: function () { openSubjectGroups(s, panel); }};
+  })};
+  if (!panel.items.length) panel.items.push({html: '<span class="px"><b>还没有学科</b><small>去编辑器里添加语文、数学……</small></span>', act: function () {}});
+  openPanel(panel);
+}
 
 // ---------- 首页 ----------
 var rows = [], focus = {r: 0, c: 0}, rowCol = {}, homeY = 0;
 
 function cardHTML(v, i, ctxPath) {
-  var pi = pathInfo[v.id], st = stageOf(v);
+  var pi = curTrack().pathInfo[v.id], st = stageOf(v);
   var title = ctxPath && pi ? pi.note : v.title;
   var sub = ctxPath && pi ? v.title : who(v) + ' · ' + lenLabel(v);
   var badge = isDone(v.id) ? '<span class="ok">✓ 看过</span>' : '';
@@ -495,24 +525,24 @@ function cardHTML(v, i, ctxPath) {
 }
 
 function renderHome() {
-  var scopeStages = stagesIn(curSubject), scopeItems = itemsIn(curSubject);
+  var track = curTrack(), scopeStages = track.stages, scopeItems = track.pathItems;
   var nu = nextUndone(scopeItems);
   var allDone = scopeItems.length && doneCount(scopeItems) === scopeItems.length;
   var html = '<section class="sec"><div class="metro" id="metro">';
-  if (SUBJECTS.length > 1) {
-    ['全部'].concat(SUBJECTS).forEach(function (s) {
-      html += '<div class="tile mt subj' + (s === curSubject ? ' on' : '') + '" data-act="subject" data-subject="' + esc(s) + '"><span class="ic">📚</span><span class="nm">' + esc(s) + '</span></div>';
+  if (TRACKS.length > 1) {
+    TRACKS.forEach(function (t) {
+      html += '<div class="tile mt subj' + (t.id === curTrackId ? ' on' : '') + '" data-act="track" data-track="' + esc(t.id) + '"><span class="ic">' + esc(t.icon || '🗺️') + '</span><span class="nm">' + esc(t.title) + '</span></div>';
     });
   }
   if (nu) {
-    var nst = stageOf(nu), npi = pathInfo[nu.id];
+    var nst = stageOf(nu), npi = track.pathInfo[nu.id];
     html += '<div class="tile big" data-act="continue">' + (nu.cover ? '<img data-src="' + esc(nu.cover) + '" alt="" referrerpolicy="no-referrer">' : '') +
       '<div class="shade"></div><span class="playbtn">▶</span><div class="txt"><span class="lbl">' + (allDone ? '路线全部看完了，再看一遍' : doneCount(scopeItems) ? '继续闯关' : '从第 1 关开始') + '</span>' +
       '<h2>' + esc(npi.note) + '</h2><p>第 ' + nst.no + ' 关 ' + esc(nst.name) + ' · 第 ' + npi.step + ' 步 · ' + esc(lenLabel(nu)) + '</p></div></div>';
   } else if (scopeStages.length) {
-    html += '<div class="tile big" data-act="random"><div class="shade"></div><span class="playbtn">🎲</span><div class="txt"><span class="lbl">还没有学习路线</span><h2>先随便看看</h2><p>在编辑器里添加属于自己的路线</p></div></div>';
+    html += '<div class="tile big" data-act="random"><div class="shade"></div><span class="playbtn">🎲</span><div class="txt"><span class="lbl">路线全部看完了</span><h2>先随便看看</h2><p>或者去「学科模式」看点别的</p></div></div>';
   } else {
-    html += '<div class="tile big" data-act="random"><div class="shade"></div><span class="playbtn">🎲</span><div class="txt"><span class="lbl">这个学科还没有关卡</span><h2>先随便看看</h2><p>去编辑器里给这个学科添加视频吧</p></div></div>';
+    html += '<div class="tile big" data-act="random"><div class="shade"></div><span class="playbtn">🎲</span><div class="txt"><span class="lbl">这条闯关路线还没有关卡</span><h2>先随便看看</h2><p>去编辑器里添加属于自己的路线吧</p></div></div>';
   }
   scopeStages.forEach(function (st) {
     var n = doneCount(st.vids), all = st.vids.length;
@@ -520,7 +550,8 @@ function renderHome() {
       '<span class="no">第 ' + st.no + ' 关</span><div class="ic">' + esc(st.icon) + '</div><div class="nm">' + esc(st.name) + '</div>' +
       '<div class="pg">' + n + ' / ' + all + '<span class="bar"><i style="width:' + (all ? Math.round(n / all * 100) : 0) + '%"></i></span></div></div>';
   });
-  html += '<div class="tile mt" data-act="random"><span class="ic">🎲</span><span class="nm">随便看看</span></div>' +
+  html += '<div class="tile mt" data-act="subjects"><span class="ic">📚</span><span class="nm">学科模式</span></div>' +
+    '<div class="tile mt" data-act="random"><span class="ic">🎲</span><span class="nm">随便看看</span></div>' +
     '<div class="tile mt" data-act="quests"><span class="ic">🔬</span><span class="nm">乐探究</span></div>' +
     '<div class="tile mt" data-act="me"><span class="ic">🏆</span><span class="nm">我的成长</span></div>' +
     '<div class="tile mt" data-act="settings"><span class="ic">⚙️</span><span class="nm">设置 / 换人</span></div>';
@@ -529,10 +560,6 @@ function renderHome() {
   var lists = [];
   scopeStages.forEach(function (st) {
     if (st.vids.length) lists.push({name: '第 ' + st.no + ' 关 · ' + st.name, sub: st.age, hue: st.hue, list: st.vids, path: true});
-  });
-  D.categories.forEach(function (c, ci) {
-    var vs = D.videos.filter(function (v) { return !v.dead && v.category === c; });
-    if (vs.length) lists.push({name: c, sub: vs.length + ' 条', hue: HUES[(ci + 5) % 9], list: vs, path: false});
   });
   lists.forEach(function (L, li) {
     html += '<section class="sec" style="--h:' + L.hue + '"><h3 class="sec-h"><span class="dot"></span>' + esc(L.name) + '<small>' + esc(L.sub) + '</small></h3>' +
@@ -640,15 +667,16 @@ function activate(r, c) {
     if (act === 'me') { openMe(); return; }
     if (act === 'quests') { openQuests(); return; }
     if (act === 'random') { playRandom(); return; }
-    if (act === 'subject') { curSubject = el.getAttribute('data-subject'); renderHome(); return; }
-    if (act === 'continue') { var scoped = itemsIn(curSubject), v = nextUndone(scoped); play(pathItems, pathItems.indexOf(v), '成长路线', true); return; }
-    var st = stages[+el.getAttribute('data-stage') - 1];
+    if (act === 'subjects') { openSubjects(); return; }
+    if (act === 'track') { curTrackId = el.getAttribute('data-track'); renderHome(); return; }
+    if (act === 'continue') { var items = curTrack().pathItems, v = nextUndone(items); play(items, items.indexOf(v), curTrack().title || '闯关路线', true); return; }
+    var st = curTrack().stages[+el.getAttribute('data-stage') - 1];
     var first = st.vids.filter(function (x) { return !isDone(x.id); })[0] || st.vids[0];
-    if (first) play(pathItems, pathItems.indexOf(first), '成长路线', true);
+    if (first) play(curTrack().pathItems, curTrack().pathItems.indexOf(first), curTrack().title || '闯关路线', true);
     else toast('这一关还没有视频，去编辑器里添加');
     return;
   }
-  play(row.list, c, row.path ? '成长路线' : row.name, row.path, row.path ? pathItems.indexOf(row.list[c]) : -1);
+  play(row.list, c, row.path ? (curTrack().title || '闯关路线') : row.name, row.path, row.path ? curTrack().pathItems.indexOf(row.list[c]) : -1);
 }
 function homeKey(k) {
   var r = focus.r, c = focus.c, row = rows[r];
@@ -681,7 +709,7 @@ var P = null;
 var mountTimer, secTimer, quietTimer, scrollBeforePlay = 0;
 
 function play(list, idx, name, isPath, pathIdx) {
-  if (isPath && pathIdx >= 0) { list = pathItems; idx = pathIdx; }
+  if (isPath && pathIdx >= 0) { list = curTrack().pathItems; idx = pathIdx; }
   scrollBeforePlay = window.pageYOffset || 0;
   if (!P) navPush('player');
   P = {list: list, idx: idx, name: name, path: isPath, elapsed: 0, paused: false};
@@ -693,7 +721,7 @@ function play(list, idx, name, isPath, pathIdx) {
   secTimer = setInterval(secTick, 1000);
 }
 function showVideo(delay) {
-  var v = P.list[P.idx], st = stageOf(v), pi = pathInfo[v.id];
+  var v = P.list[P.idx], st = stageOf(v), pi = curTrack().pathInfo[v.id];
   P.elapsed = 0; P.paused = false; P.marked = false;
   $('#player').classList.remove('is-paused');
   var pill = $('#p-pill');
@@ -859,7 +887,7 @@ function focusVideo(v) {
   }
   for (var k = 1; k < rows.length; k++) {
     var j = rows[k].list.indexOf(v);
-    if (j >= 0 && (rows[k].path === !!pathInfo[v.id])) { cleanFocus(); setFocus(k, j, true); return; }
+    if (j >= 0 && (rows[k].path === !!curTrack().pathInfo[v.id])) { cleanFocus(); setFocus(k, j, true); return; }
   }
 }
 
@@ -915,7 +943,7 @@ $('#strip-track').addEventListener('click', function (e) {
 $('#panel').addEventListener('click', function (e) {
   var it = e.target.closest ? e.target.closest('.pitem') : null;
   if (it && PN) { panelFocus(+it.getAttribute('data-pi')); var x = PN.items[PN.idx]; if (x && x.act) x.act(); return; }
-  if (e.target === $('#panel') && PN && PN.closable) closePanel();
+  if (e.target === $('#panel') && PN) { if (PN.parent) { PN = PN.parent; renderPanel(); } else if (PN.closable) closePanel(); }
 });
 $('#who').addEventListener('click', function () { openSettings(); });
 $('#p-wake').addEventListener('click', function () { wake(6000); });
@@ -936,7 +964,7 @@ $('#player').addEventListener('click', function (e) {
 
 // ---------- 启动 ----------
 BP.hooks.toast = toast;
-BP.hooks.stagesCleared = function () { return stages.filter(function (s) { return s.vids.length && doneCount(s.vids) === s.vids.length; }).length; };
+BP.hooks.stagesCleared = function () { return TRACKS.reduce(function (n, t) { return n + t.stages.filter(function (s) { return s.vids.length && doneCount(s.vids) === s.vids.length; }).length; }, 0); };
 BP.on('change', function () { if (D) refreshTop(); });
 tick();
 setInterval(tick, 15000);

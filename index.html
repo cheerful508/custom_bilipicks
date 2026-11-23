@@ -82,7 +82,7 @@ body.bars-hidden .top{transform:translateY(-100%)}
 /* 手机底部标签栏 */
 .tabs{
   display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;
-  grid-template-columns:repeat(5,1fr);
+  grid-template-columns:repeat(6,1fr);
   padding-bottom:env(safe-area-inset-bottom);
   background:color-mix(in oklab,var(--surface) 94%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-top:1px solid var(--line);transition:transform .25s ease;
@@ -430,6 +430,8 @@ body.tv .tv-bar{position:fixed;left:0;right:0;bottom:0;height:60px;z-index:61;di
 
   <section id="view-path" hidden><div class="page" id="path-root"></div></section>
 
+  <section id="view-subjects" hidden><div class="page wide" id="subjects-root"></div></section>
+
   <section id="view-tiers" hidden><div class="page wide" id="tiers-root"></div></section>
 
   <section id="view-explore" hidden><div class="page wide" id="explore-root"></div></section>
@@ -526,7 +528,8 @@ const store = {
 
 const NAV = [
   {view: 'home', label: '首页', icon: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'},
-  {view: 'path', label: '路线', icon: '<path d="M6 21V4m0 1h12l-2.5 3.5L18 12H6"/>'},
+  {view: 'path', label: '闯关', icon: '<path d="M6 21V4m0 1h12l-2.5 3.5L18 12H6"/>'},
+  {view: 'subjects', label: '学科', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'},
   {view: 'watch', label: '播放', icon: '<path d="M7 4.5v15l12-7.5z"/>'},
   {view: 'explore', label: '乐探究', icon: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3"/>'},
   {view: 'me', label: '我的', icon: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'},
@@ -545,6 +548,8 @@ const state = {
   from: 'home',
   tv: false,
   tierFilter: 'all',
+  trackId: '',                 // 当前选中的闯关路线
+  subjId: '', groupId: '',     // 学科模式当前选中的学科 / 目录
 };
 
 // ---------- 看完标记、动手任务（每个孩子一份，只存在这台设备的浏览器里） ----------
@@ -557,45 +562,55 @@ function toggleDone(id) {
   store.set(DONE_KEY, done);
 }
 
-// ---------- 成长路线 ----------
+// ---------- 闯关模式：多条路线 ----------
 const byId = {};
 DATA.videos.forEach(v => { byId[v.id] = v; });
-const PATH = DATA.path || {stages: []};
-const pathInfo = {};   // id -> {stage, step, note}
-const pathItems = [];  // 按顺序展开，跳过失效视频
-const stages = PATH.stages.map((st, si) => {
-  const s = {...st, no: si + 1, hue: HUES[si % HUES.length], vids: []};
-  st.items.forEach(it => {
-    const v = byId[it.id];
-    if (!v || v.dead) return;
-    s.vids.push(v);
-    pathInfo[v.id] = {stage: s.no, step: s.vids.length, note: it.note};
-    pathItems.push(v);
+const TRACKS = (DATA.tracks || []).map(t => {
+  const pathInfo = {};   // id -> {stage, step, note}
+  const pathItems = [];  // 按顺序展开，跳过失效视频
+  const stages = (t.stages || []).map((st, si) => {
+    const s = {...st, no: si + 1, hue: HUES[si % HUES.length], vids: []};
+    (st.items || []).forEach(it => {
+      const v = byId[it.id];
+      if (!v || v.dead) return;
+      s.vids.push(v);
+      pathInfo[v.id] = {stage: s.no, step: s.vids.length, note: it.note};
+      pathItems.push(v);
+    });
+    return s;
   });
-  return s;
+  return {id: t.id, icon: t.icon || '', title: t.title || '', intro: t.intro || '', tips: t.tips || [], stages, pathInfo, pathItems};
 });
+const trackById = {};
+TRACKS.forEach(t => { trackById[t.id] = t; });
+state.trackId = TRACKS[0] ? TRACKS[0].id : '';
+const EMPTY_TRACK = {id: '', icon: '', title: '', intro: '', tips: [], stages: [], pathInfo: {}, pathItems: []};
+const curTrack = () => trackById[state.trackId] || TRACKS[0] || EMPTY_TRACK;
+const trackContaining = id => TRACKS.find(t => t.pathInfo[id]);
 const doneCount = list => list.filter(v => isDone(v.id)).length;
-const nextUndone = (list) => (list || pathItems).find(v => !isDone(v.id));
-const stageOf = v => v && pathInfo[v.id] ? stages[pathInfo[v.id].stage - 1] : null;
-const SUBJECTS = BP.subjectsOf(DATA);
-const stagesIn = subj => subj === '全部' ? stages : stages.filter(s => s.subject === subj);
-const itemsIn = subj => stagesIn(subj).reduce((a, s) => a.concat(s.vids), []);
-function subjectTabs(cur, attr) {
-  if (SUBJECTS.length < 2) return '';
-  const tabs = ['全部', ...SUBJECTS];
-  return `<div class="chips subject-tabs" role="tablist">${tabs.map(s =>
-    `<button type="button" role="tab" aria-selected="${s === cur}" class="chip ${s === cur ? 'on' : ''}" data-${attr}="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
+const nextUndone = (list) => (list || curTrack().pathItems).find(v => !isDone(v.id));
+const stageOf = v => { if (!v) return null; const t = curTrack(); return t.pathInfo[v.id] ? t.stages[t.pathInfo[v.id].stage - 1] : null; };
+function trackTabs(cur, attr) {
+  if (TRACKS.length < 2) return '';
+  return `<div class="chips subject-tabs" role="tablist">${TRACKS.map(t =>
+    `<button type="button" role="tab" aria-selected="${t.id === cur}" class="chip ${t.id === cur ? 'on' : ''}" data-${attr}="${esc(t.id)}">${esc(t.icon)} ${esc(t.title)}</button>`).join('')}</div>`;
 }
-state.pathSubject = '全部';
 
 function listFor(cat, q) {
   q = q.trim().toLowerCase();
-  const base = cat === PATH_CAT ? pathItems
+  const base = cat === PATH_CAT ? curTrack().pathItems
     : DATA.videos.filter(v => !v.dead && (cat === '全部' || v.category === cat));
   if (!q) return base;
   return base.filter(v => `${v.title} ${v.channel} ${v.category} ${v.orig || ''}`.toLowerCase().includes(q));
 }
-const ctxName = c => c.q.trim() ? `搜索「${c.q.trim()}」` : c.cat === '全部' ? '全部视频' : c.cat;
+const ctxName = c => c.ids ? (c.name || '学科目录') : c.q.trim() ? `搜索「${c.q.trim()}」` : c.cat === '全部' ? '全部视频' : c.cat;
+function playGroupVideos(ids, idx, name) {
+  state.ctx = {cat: '', q: '', ids, name};
+  state.idx = Math.max(0, idx);
+  state.picked = true;
+  state.wantPlay = true;
+  go('watch');
+}
 
 // ---------- 小工具 ----------
 function clock(sec) {
@@ -653,29 +668,32 @@ function toggleTheme() {
 
 // ---------- 首页 ----------
 function renderHero() {
-  const scoped = stagesIn(state.pathSubject);
-  const items = itemsIn(state.pathSubject);
+  const track = curTrack();
+  const scoped = track.stages;
+  const items = track.pathItems;
   const n = items.length, d = doneCount(items);
   const nx = nextUndone(items);
   const cur = stageOf(nx);
   let main;
-  if (!n) {
+  if (!track.id) {
+    main = '';
+  } else if (!n) {
     main = '';
   } else if (!nx) {
     main = `<div class="hero-main" style="grid-template-columns:1fr"><div>
-      <p class="hero-kicker">${esc(PATH.title)}</p>
+      <p class="hero-kicker">${esc(track.title)}</p>
       <h1>${n} 条全看完了，${scoped.length} 关通关</h1>
       <p class="hero-sub">接下来别停在看视频上：去「乐探究」挑一个课题动手试一试，或者找一个你想解决的小问题。</p>
       <div class="hero-actions"><button type="button" class="btn primary" data-go="explore">🔬 去乐探究</button><button type="button" class="btn" data-go="path">回看整条路线</button></div>
     </div></div>`;
   } else {
-    const pi = pathInfo[nx.id];
+    const pi = track.pathInfo[nx.id];
     main = `<div class="hero-main" style="--h:${cur.hue}">
       <button type="button" class="hero-cover" data-play="${esc(nx.id)}" aria-label="播放：${esc(nx.title)}">
         ${cover(nx)}<span class="playdot" aria-hidden="true">▶</span>${nx.duration ? `<span class="dur">${esc(clock(nx.duration))}</span>` : ''}
       </button>
       <div>
-        <p class="hero-kicker">${stagePill(cur, `第 ${cur.no} 关`)}<span>${esc(PATH.title)}，${d ? `已看 ${d} / ${n}` : `一共 ${scoped.length} 关`}</span></p>
+        <p class="hero-kicker">${stagePill(cur, `第 ${cur.no} 关`)}<span>${esc(track.title)}，${d ? `已看 ${d} / ${n}` : `一共 ${scoped.length} 关`}</span></p>
         <h1>${esc(pi.note)}</h1>
         <p class="hero-sub">${esc(nx.title)}</p>
         <div class="hero-actions">
@@ -694,7 +712,7 @@ function renderHero() {
       <span class="node-count">${st.later && !dn ? esc(String(st.age || '').split(' · ')[0]) : `${dn} / ${all}`}</span>
     </button>`;
   }).join('');
-  $('#hero').innerHTML = subjectTabs(state.pathSubject, 'hero-subject') + main + `<div class="trail">${trail}</div>`;
+  $('#hero').innerHTML = trackTabs(state.trackId, 'hero-track') + main + `<div class="trail">${trail}</div>`;
   const now = $('#hero .node.now');
   if (now) { const tr = now.parentNode; tr.scrollLeft = now.offsetLeft - tr.clientWidth / 2 + now.clientWidth / 2; }
 }
@@ -723,7 +741,7 @@ function renderHome() { renderKidbar(); renderHero(); renderChips(); renderGrid(
 
 // ---------- 路线页 ----------
 function stepHTML(v) {
-  const pi = pathInfo[v.id], ok = isDone(v.id);
+  const pi = curTrack().pathInfo[v.id], ok = isDone(v.id);
   return `<li><button type="button" class="step ${ok ? 'is-done' : ''}" data-play="${esc(v.id)}">
     <span class="n">${ok ? '✓' : pi.step}</span>
     <span class="mini">${cover(v)}</span>
@@ -733,8 +751,9 @@ function stepHTML(v) {
   </button></li>`;
 }
 function renderPath(openStage) {
-  const scoped = stagesIn(state.pathSubject);
-  const items = itemsIn(state.pathSubject);
+  const track = curTrack();
+  const scoped = track.stages;
+  const items = track.pathItems;
   const n = items.length, d = doneCount(items);
   const nx = nextUndone(items);
   let dividerShown = false;
@@ -768,17 +787,17 @@ function renderPath(openStage) {
     </section>`;
   }).join('');
   $('#path-root').innerHTML = `
-    <h1>${esc(PATH.title || '成长路线')}</h1>
-    <p class="lead">${esc(PATH.intro || '')}</p>
-    <p style="margin-top:10px"><a class="btn sm" href="editor.html#path">✏️ 编辑我的路线</a></p>
-    <div class="path-progress">
+    <h1>${esc(track.title || '闯关模式')}</h1>
+    <p class="lead">${esc(track.intro || '')}</p>
+    <p style="margin-top:10px"><a class="btn sm" href="editor.html#path">✏️ 编辑我的闯关路线</a></p>
+    ${track.id ? `<div class="path-progress">
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${d}" aria-label="路线进度"><i style="width:${n ? d / n * 100 : 0}%"></i></div>
       <span class="count">已看 ${d} / ${n}</span>
       ${nx ? `<button type="button" class="btn primary sm" data-play="${esc(nx.id)}">${d ? '接着看' : '从第 1 关开始'}</button>` : ''}
     </div>
-    <details class="parents"><summary>给家长的 ${(PATH.tips || []).length} 条建议</summary><ul>${(PATH.tips || []).map(t => `<li>${esc(t)}</li>`).join('')}</ul></details>
-    ${subjectTabs(state.pathSubject, 'path-subject')}
-    ${html || '<p class="empty">这个学科还没有关卡，去编辑器里添加视频吧。</p>'}
+    <details class="parents"><summary>给家长的 ${(track.tips || []).length} 条建议</summary><ul>${(track.tips || []).map(t => `<li>${esc(t)}</li>`).join('')}</ul></details>` : ''}
+    ${trackTabs(state.trackId, 'path-track')}
+    ${html || '<p class="empty">这条闯关路线还没有关卡，去<a href="editor.html#path">编辑器</a>里添加视频吧。</p>'}
     <p class="fine">进度只记在这台设备的浏览器里，清除浏览数据会丢。在播放页点「✓ 看完了」打勾，再点一次取消。</p>`;
 }
 
@@ -836,10 +855,50 @@ function renderAbout() {
   const name = esc(who.join(' · ') || '家长');
   const link = s.curatorUrl ? `<a href="${esc(s.curatorUrl)}" target="_blank" rel="noopener noreferrer">${name}</a>` : name;
   $('#about-credit').innerHTML = `公共清单原策展：${link}`;
+  const totalStages = TRACKS.reduce((n, t) => n + t.stages.length, 0);
+  const totalSteps = TRACKS.reduce((n, t) => n + t.pathItems.length, 0);
   $('#about-kpis').innerHTML = `
     <div class="kpi"><b>${DATA.videos.filter(v => !v.dead).length}</b><span>手选视频</span></div>
-    <div class="kpi"><b>${stages.length} 关 ${pathItems.length} 步</b><span>成长路线</span></div>
+    <div class="kpi"><b>${totalStages} 关 ${totalSteps} 步</b><span>${TRACKS.length} 条闯关路线</span></div>
     <div class="kpi"><b>${(DATA.tiers || []).reduce((n, t) => n + t.items.length, 0) + (DATA.originals || []).length}</b><span>频道榜收录</span></div>`;
+}
+
+// ---------- 学科模式 ----------
+function groupVideos(g) { return (g && g.videoIds || []).map(id => byId[id]).filter(v => v && !v.dead); }
+function renderSubjects() {
+  const subjects = DATA.subjects || [];
+  const root = $('#subjects-root');
+  if (!subjects.length) {
+    root.innerHTML = `<h1>📚 学科模式</h1><p class="lead">按学科整理的目录，想学什么直接点进去。</p><p class="empty">还没有学科，去<a href="editor.html#subjects">编辑器</a>里添加。</p>`;
+    return;
+  }
+  if (!subjects.some(s => s.id === state.subjId)) { state.subjId = subjects[0].id; state.groupId = ''; }
+  const subj = subjects.find(s => s.id === state.subjId);
+  const groups = subj.groups || [];
+  const subjChips = `<div class="chips subject-tabs" role="tablist">${subjects.map(s =>
+    `<button type="button" role="tab" aria-selected="${s.id === state.subjId}" class="chip ${s.id === state.subjId ? 'on' : ''}" data-subj="${esc(s.id)}">${esc(s.icon || '')} ${esc(s.name)}</button>`).join('')}</div>`;
+  const group = groups.find(g => g.id === state.groupId);
+  let body;
+  if (group) {
+    const vids = groupVideos(group);
+    body = `<p style="margin:14px 0 2px"><button type="button" class="btn sm" data-back-group>← 返回${esc(subj.name)}的目录</button></p>
+      <h2 class="sec">${esc(group.name)}</h2>
+      <div class="grid">${vids.map(v => `<button type="button" class="card" data-subj-play="${esc(v.id)}">
+        <span class="thumb">${cover(v)}${isDone(v.id) ? '<span class="seen">✓ 看过</span>' : ''}${v.duration ? `<span class="dur">${esc(isSeries(v) ? `${v.parts} 集` : clock(v.duration))}</span>` : ''}</span>
+        <span class="card-t">${esc(v.title)}</span>
+        <span class="card-s"><span class="who">${esc(who(v))}</span><span class="tag">${v.minAge}+</span></span>
+      </button>`).join('') || '<p class="empty">这个目录还没有视频，去编辑器里添加吧。</p>'}</div>`;
+  } else {
+    body = `<div class="grid">${groups.map(g => {
+      const vids = groupVideos(g);
+      return `<button type="button" class="card" data-group="${esc(g.id)}">
+        <span class="thumb">${vids[0] ? cover(vids[0]) : ''}</span>
+        <span class="card-t">${esc(g.name)}</span>
+        <span class="card-s"><span class="who">${vids.length} 个视频</span></span>
+      </button>`;
+    }).join('') || `<p class="empty">「${esc(subj.name)}」还没有目录，去<a href="editor.html#subjects">编辑器</a>里添加年级或知识点吧。</p>`}</div>`;
+  }
+  root.innerHTML = `<h1>📚 学科模式</h1><p class="lead">按学科整理的目录，想学什么直接点进去。</p>${subjChips}${body}`;
 }
 
 // ---------- 播放页 ----------
@@ -850,7 +909,7 @@ const posterHTML = v => `<button type="button" class="poster" data-act="play" ar
   ${cover(v)}<span class="playdot" aria-hidden="true">▶</span>${v.duration ? `<span class="dur">${esc(clock(v.duration))}${isSeries(v) ? `，共 ${v.parts} 集` : ''}</span>` : ''}</button>`;
 
 function slideHTML(v, i) {
-  const pi = pathInfo[v.id], st = stageOf(v), c = cautionOf(v), nx = feedList[i + 1];
+  const pi = curTrack().pathInfo[v.id], st = stageOf(v), c = cautionOf(v), nx = feedList[i + 1];
   const badges = [
     st ? `<button type="button" data-stage="${st.no}" title="去路线页看这一关">${stagePill(st, `第 ${st.no} 关，第 ${pi.step} 步`)}</button>` : '',
     `<span class="tag">${esc(v.category)}</span>`,
@@ -876,7 +935,7 @@ function slideHTML(v, i) {
         <a class="btn" href="editor.html#video/${esc(v.id)}" title="改这条视频的说明和探究题">✏️ 改这条</a>
       </div>
       <button type="button" class="next-hint" data-act="next">${nx
-        ? `<span class="arrow touch" aria-hidden="true">︿</span><span class="lbl"><span class="touch">上滑看下一条</span><span class="wide-only">下一条</span></span><span class="nt">${esc(pathInfo[nx.id] && state.ctx.cat === PATH_CAT ? pathInfo[nx.id].note : nx.title)}</span>`
+        ? `<span class="arrow touch" aria-hidden="true">︿</span><span class="lbl"><span class="touch">上滑看下一条</span><span class="wide-only">下一条</span></span><span class="nt">${esc(curTrack().pathInfo[nx.id] && state.ctx.cat === PATH_CAT ? curTrack().pathInfo[nx.id].note : nx.title)}</span>`
         : `<span class="lbl">这是最后一条</span><span class="nt">点这里回到第一条</span>`}</button>
     </div>
   </article>`;
@@ -955,7 +1014,7 @@ const io = new IntersectionObserver(entries => {
 }, {root: feed, threshold: .6});
 
 function renderFeed() {
-  feedList = listFor(state.ctx.cat, state.ctx.q);
+  feedList = state.ctx.ids ? state.ctx.ids.map(id => byId[id]).filter(v => v && !v.dead) : listFor(state.ctx.cat, state.ctx.q);
   io.disconnect();
   $('#feed-name').textContent = ctxName(state.ctx);
   if (!feedList.length) {
@@ -1006,7 +1065,7 @@ function openSheet() {
   $('#sheet-title').textContent = ctxName(state.ctx);
   $('#sheet-count').textContent = `${feedList.length} 条，看过 ${doneCount(feedList)} 条`;
   $('#sheet-list').innerHTML = feedList.map((v, i) => {
-    const pi = pathInfo[v.id], st = stageOf(v);
+    const pi = curTrack().pathInfo[v.id], st = stageOf(v);
     let head = '';
     if (inPath && pi.stage !== last) {
       last = pi.stage;
@@ -1045,7 +1104,7 @@ function playCtx(ctx, idx, play = true) {
   state.wantPlay = play;
 }
 function playPath(id) {
-  playCtx({cat: PATH_CAT, q: ''}, pathItems.findIndex(v => v.id === id));
+  playCtx({cat: PATH_CAT, q: ''}, curTrack().pathItems.findIndex(v => v.id === id));
   go('watch');
 }
 function parseHash() {
@@ -1056,12 +1115,15 @@ function prepareWatch(id) {
   if (id && byId[id] && !byId[id].dead) {
     const here = listFor(state.ctx.cat, state.ctx.q).findIndex(v => v.id === id);
     if (state.picked && here >= 0) { state.idx = here; return; }
-    const ctx = pathInfo[id] ? {cat: PATH_CAT, q: ''} : {cat: '全部', q: ''};
+    const t = trackContaining(id);
+    if (t) state.trackId = t.id;
+    const ctx = t ? {cat: PATH_CAT, q: ''} : {cat: '全部', q: ''};
     playCtx(ctx, listFor(ctx.cat, '').findIndex(v => v.id === id), false);
   } else if (!state.picked) {
-    // 还没挑过视频就点「播放」：接着路线往下看
-    const nx = nextUndone() || pathItems[0];
-    playCtx({cat: PATH_CAT, q: ''}, pathItems.indexOf(nx), false);
+    // 还没挑过视频就点「播放」：接着当前闯关路线往下看
+    const items = curTrack().pathItems;
+    const nx = nextUndone(items) || items[0];
+    playCtx({cat: PATH_CAT, q: ''}, items.indexOf(nx), false);
   }
 }
 function render(arg) {
@@ -1072,7 +1134,7 @@ function render(arg) {
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
   VIEWS.forEach(name => { $('#view-' + name).hidden = state.view !== name; });
-  ({home: renderHome, path: renderPath, tiers: renderTiers, about: renderAbout, watch: renderFeed, explore: renderExplore, me: renderMe})[state.view](arg);
+  ({home: renderHome, path: renderPath, subjects: renderSubjects, tiers: renderTiers, about: renderAbout, watch: renderFeed, explore: renderExplore, me: renderMe})[state.view](arg);
 }
 function go(view, {push = true, restore = false, id, arg} = {}) {
   if (state.tv) setTV(false);
@@ -1091,7 +1153,6 @@ function go(view, {push = true, restore = false, id, arg} = {}) {
   if (view !== 'watch') { window.scrollTo(0, restore ? (scrollPos[view] || 0) : 0); lastY = window.scrollY; }
 }
 function goStage(no) {
-  state.pathSubject = '全部';
   go('path', {arg: no});
   const el = $('#stage-' + no);
   if (el) el.scrollIntoView();
@@ -1126,11 +1187,11 @@ $('#logo').addEventListener('click', e => { e.preventDefault(); go('home'); });
 $('#btn-theme').onclick = toggleTheme;
 
 $('#hero').addEventListener('click', e => {
-  const p = e.target.closest('[data-play]'), g = e.target.closest('[data-go]'), s = e.target.closest('[data-stage]'), t = e.target.closest('[data-hero-subject]');
+  const p = e.target.closest('[data-play]'), g = e.target.closest('[data-go]'), s = e.target.closest('[data-stage]'), t = e.target.closest('[data-hero-track]');
   if (p) playPath(p.dataset.play);
   else if (g) go(g.dataset.go);
   else if (s) goStage(+s.dataset.stage);
-  else if (t) { state.pathSubject = t.dataset.heroSubject; renderHero(); }
+  else if (t) { state.trackId = t.dataset.heroTrack; renderHero(); }
 });
 $('#chips').addEventListener('click', e => {
   const b = e.target.closest('[data-cat]');
@@ -1150,14 +1211,26 @@ $('#search').addEventListener('input', e => {
   if (state.view === 'home') renderGrid(); else go('home');
 });
 $('#path-root').addEventListener('click', e => {
-  const p = e.target.closest('[data-play]'), t = e.target.closest('[data-path-subject]');
+  const p = e.target.closest('[data-play]'), t = e.target.closest('[data-path-track]');
   if (p) playPath(p.dataset.play);
-  else if (t) { state.pathSubject = t.dataset.pathSubject; renderPath(); }
+  else if (t) { state.trackId = t.dataset.pathTrack; renderPath(); }
+});
+$('#subjects-root').addEventListener('click', e => {
+  const s = e.target.closest('[data-subj]'), g = e.target.closest('[data-group]'), back = e.target.closest('[data-back-group]'), p = e.target.closest('[data-subj-play]');
+  if (s) { state.subjId = s.dataset.subj; state.groupId = ''; renderSubjects(); }
+  else if (g) { state.groupId = g.dataset.group; renderSubjects(); }
+  else if (back) { state.groupId = ''; renderSubjects(); }
+  else if (p) {
+    const subj = (DATA.subjects || []).find(x => x.id === state.subjId);
+    const group = subj && (subj.groups || []).find(x => x.id === state.groupId);
+    const vids = groupVideos(group);
+    playGroupVideos(vids.map(v => v.id), vids.findIndex(v => v.id === p.dataset.subjPlay), (subj ? subj.name + ' · ' : '') + (group ? group.name : ''));
+  }
 });
 $('#path-root').addEventListener('change', e => {
   const key = e.target.dataset && e.target.dataset.mission;
   if (!key) return;
-  const stg = stages.find(x => x.key === key);
+  const stg = curTrack().stages.find(x => x.key === key);
   if (e.target.checked) { missions[key] = Date.now(); store.set(MISSION_KEY, missions); kidsMissionDone(key, stg ? stg.no : ''); }
   else { delete missions[key]; store.set(MISSION_KEY, missions); }
 });

@@ -82,13 +82,6 @@ details.stage>summary .nm{flex:1;min-width:0;font-weight:800;overflow:hidden;tex
 details.stage>summary .cnt{color:var(--muted);font-size:13px;font-weight:600}
 .sbody{padding:4px 14px 14px;display:grid;gap:12px;border-top:1px dashed var(--line)}
 .sbar{display:flex;flex-wrap:wrap;gap:6px}
-.subject-group{margin-bottom:16px}
-.subject-group>details{background:none;border:none}
-.subject-head{list-style:none;display:flex;align-items:center;gap:10px;padding:6px 2px;cursor:pointer;font-size:15px}
-.subject-head::-webkit-details-marker{display:none}
-.subject-head .nm{flex:1;font-weight:800}
-.subject-head .cnt{color:var(--muted);font-size:13px;font-weight:600}
-.subject-body{display:grid;gap:12px;margin-top:8px}
 .items{display:grid;gap:6px}
 .it{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px;border-radius:12px;background:var(--bg)}
 .cov{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--soft)}
@@ -170,7 +163,7 @@ table.rules td:last-child{text-align:right;font-weight:800;white-space:nowrap}
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const E = BP.esc;
-const TABS = [['profile', '👤', '档案'], ['path', '🗺️', '学习路线'], ['videos', '🎞️', '视频清单'], ['explore', '🔬', '乐探究'], ['rewards', '🎁', '奖励'], ['backup', '💾', '备份与重置']];
+const TABS = [['profile', '👤', '档案'], ['path', '🗺️', '闯关模式'], ['subjects', '📚', '学科模式'], ['videos', '🎞️', '视频清单'], ['explore', '🔬', '乐探究'], ['rewards', '🎁', '奖励'], ['backup', '💾', '备份与重置']];
 
 /* ---------- 家长口令 ---------- */
 (function gate() {
@@ -199,7 +192,7 @@ let tab = 'profile';
 let custom = BP.getCustom(pid);
 let saveTimer, toastTimer;
 const openStages = {};
-const openGroups = {};
+let curTrack = '', curSubj = '', curGroup = '';
 let vFilter = {q: '', cat: '', show: 30}, openVideo = '', exVideo = '';
 
 const profile = () => BP.profile(pid);
@@ -309,20 +302,25 @@ function renderProfile() {
   paintPreview();
 }
 
-/* ---------- 路线 ---------- */
+/* ---------- 闯关模式 ---------- */
+function curTrackObj() { return (custom.tracks || []).find(x => x.id === curTrack); }
 function renderPath() {
-  const p = custom.path, vm = vmap(), kid = profile();
-  const subjectOpts = ['未分类', ...merged().categories];
-  if (!p) {
-    $('#panel').innerHTML = `<h2>🗺️ 学习路线</h2><p class="lead">现在 ${E(kid.name)} 用的是公共路线（${BP.basePath().stages.length} 关）。想要自己的路线，先复制一份，之后就能随便增删改。</p>
-    <div class="card"><h3>开始自定义 ${E(kid.name)} 的路线</h3><div class="acts" style="margin-top:0">
-      <button type="button" class="btn primary" data-act="path-start" data-mode="full">复制完整公共路线</button>
-      <button type="button" class="btn" data-act="path-start" data-mode="five">只要前 5 关（适合 9～10 岁起步）</button>
-      <button type="button" class="btn" data-act="path-start" data-mode="blank">从空白开始</button></div>
-      <p class="hint" style="margin-top:10px">已经看完的记录不会丢：进度按视频记，不按路线记。</p></div>`;
+  const kid = profile();
+  if (!custom.tracks) {
+    const bt = BP.baseTracks();
+    $('#panel').innerHTML = `<h2>🗺️ 闯关模式</h2><p class="lead">现在 ${E(kid.name)} 用的是公共闯关路线（共 ${bt.length} 条）。想要自己的闯关路线，先复制一份，之后就能随便增删改，还能新建更多闯关目标（比如数学闯关、英语闯关）。</p>
+    <div class="card"><h3>开始自定义 ${E(kid.name)} 的闯关模式</h3><div class="acts" style="margin-top:0">
+      <button type="button" class="btn primary" data-act="tracks-start" data-mode="full">复制全部公共闯关</button>
+      <button type="button" class="btn" data-act="tracks-start" data-mode="blank">从空白开始</button></div>
+      <p class="hint" style="margin-top:10px">已经看完的记录不会丢：进度按视频记，不按闯关记。</p></div>`;
     return;
   }
+  const tracks = custom.tracks;
+  if (!curTrack || !tracks.some(x => x.id === curTrack)) curTrack = tracks[0] ? tracks[0].id : '';
+  const t = curTrackObj();
+  const chips = tracks.map(tr => `<button type="button" class="btn sm ${tr.id === curTrack ? 'primary' : ''}" data-act="track-pick" data-tid="${E(tr.id)}">${E(tr.icon || '⭐')} ${E(tr.title || '未命名')}</button>`).join('');
   const stageCard = (st, si) => {
+    const vm = vmap();
     const items = st.items.map((it, ii) => {
       const v = vm[it.id];
       return `<div class="it"><span class="cov">${cover(v)}</span><div><input type="text" class="nt" data-sc="item" data-s="${si}" data-i="${ii}" data-k="note" value="${E(it.note || '')}" placeholder="这一步的说明">
@@ -336,7 +334,6 @@ function renderPath() {
           <label class="f">图标（一个表情）<input type="text" data-sc="stage" data-s="${si}" data-k="icon" value="${E(st.icon || '')}" maxlength="4"></label>
           <label class="f">关卡名字<input type="text" data-sc="stage" data-s="${si}" data-k="name" value="${E(st.name)}"></label>
           <label class="f">适合年龄 / 小提示<input type="text" data-sc="stage" data-s="${si}" data-k="age" value="${E(st.age || '')}" placeholder="例如：9 岁+ · 现在就能看"></label>
-          <label class="f">学科<select data-sc="stage" data-s="${si}" data-k="subject">${subjectOpts.map(c => `<option ${c === (st.subject || '未分类') ? 'selected' : ''}>${E(c)}</option>`).join('')}</select></label>
         </div>
         <label class="f">这一关想达成什么<textarea data-sc="stage" data-s="${si}" data-k="goal">${E(st.goal || '')}</textarea></label>
         <label class="chk"><input type="checkbox" data-sc="stage" data-s="${si}" data-k="later" ${st.later ? 'checked' : ''}>留到以后再看（灰色、折叠起来）</label>
@@ -349,47 +346,93 @@ function renderPath() {
         <div class="sbar"><button type="button" class="btn sm" data-act="st-up" data-s="${si}">↑ 上移这一关</button><button type="button" class="btn sm" data-act="st-down" data-s="${si}">↓ 下移</button><button type="button" class="btn sm danger" data-act="st-del" data-s="${si}">删除这一关</button></div>
       </div></details>`;
   };
-  const bySubject = {};
-  p.stages.forEach((st, si) => {
-    const subj = st.subject || '未分类';
-    (bySubject[subj] = bySubject[subj] || []).push(si);
-  });
-  const subjectOrder = subjectOpts.concat(Object.keys(bySubject).filter(s => !subjectOpts.includes(s)));
-  const stages = subjectOrder.filter(subj => bySubject[subj]).map(subj => {
-    const key = 'g-' + subj;
-    const cards = bySubject[subj].map(si => stageCard(p.stages[si], si)).join('');
-    return `<section class="subject-group"><details ${openGroups[key] === false ? '' : 'open'} data-group="${E(subj)}"><summary class="subject-head"><span class="nm">📚 ${E(subj)}</span><span class="cnt">${bySubject[subj].length} 关</span></summary><div class="subject-body">${cards}</div></details></section>`;
-  }).join('');
-  $('#panel').innerHTML = `<h2>🗺️ ${E(kid.name)} 的学习路线</h2><p class="lead">一关一关往前闯。每一关可以放几条视频，再配一个动手任务。改动自动保存，回到首页刷新就能看到。</p>
-  <div class="card"><div class="row"><label class="f">路线名字<input type="text" data-sc="path" data-k="title" value="${E(p.title || '')}"></label>
-    <label class="f wide">路线说明<textarea data-sc="path" data-k="intro">${E(p.intro || '')}</textarea></label>
-    <label class="f wide">给家长的建议（一行一条）<textarea data-sc="path" data-k="tips">${E((p.tips || []).join('\n'))}</textarea></label></div></div>
-  ${stages || '<p class="hint">还没有关卡。</p>'}
-  <div class="acts"><button type="button" class="btn primary" data-act="st-add">＋ 添加一关</button><button type="button" class="btn danger" data-act="path-reset">换回公共路线</button></div>`;
+  const stages = t ? t.stages.map(stageCard).join('') : '';
+  $('#panel').innerHTML = `<h2>🗺️ 闯关模式</h2><p class="lead">可以同时维护好几条独立的闯关路线（比如 AI 学习、数学闯关……），每条路线一关一关往前闯，每一关配几条视频和一个动手任务。改动自动保存，回到首页刷新就能看到。</p>
+  <div class="card" style="padding:10px 16px"><div class="acts" style="margin:0"><div class="sws" style="gap:6px">${chips}</div><button type="button" class="btn sm primary" data-act="track-add">＋新建闯关</button></div></div>
+  ${t ? `<div class="card"><div class="row"><label class="f">图标<input type="text" data-sc="track" data-k="icon" value="${E(t.icon || '')}" maxlength="4"></label>
+    <label class="f wide">闯关名字<input type="text" data-sc="track" data-k="title" value="${E(t.title || '')}"></label>
+    <label class="f wide">说明<textarea data-sc="track" data-k="intro">${E(t.intro || '')}</textarea></label>
+    <label class="f wide">给家长的建议（一行一条）<textarea data-sc="track" data-k="tips">${E((t.tips || []).join('\n'))}</textarea></label></div></div>
+  ${stages || '<p class="hint">这条闯关还没有关卡。</p>'}
+  <div class="acts"><button type="button" class="btn primary" data-act="st-add">＋ 添加一关</button><button type="button" class="btn danger" data-act="track-del" data-tid="${E(t.id)}">删除这条闯关</button></div>` : '<p class="hint">还没有闯关，点上面「＋新建闯关」开始。</p>'}
+  <div class="acts"><button type="button" class="btn" data-act="tracks-reset">恢复所有闯关为公共版本</button></div>`;
 }
-function openPicker(si) {
-  const st = custom.path.stages[si], have = new Set(); custom.path.stages.forEach(s => s.items.forEach(i => have.add(i.id)));
+function pickVideosInto(title, alreadyInSet, onAdd) {
   const vids = merged().videos.filter(v => !v.hidden);
   const cats = [...new Set(vids.map(v => v.category))];
   const body = `<div class="filters"><input type="text" id="pk-q" placeholder="搜标题、UP 主"><select id="pk-c"><option value="">全部分类</option>${cats.map(c => `<option>${E(c)}</option>`).join('')}</select></div><div id="pk-list"></div>`;
-  modal(`给「${st.name}」添加视频`, body, '<span class="hint">灰色的已经在某一关里了</span><button type="button" class="btn primary" id="pk-ok">添加所选</button>', (w, close) => {
+  modal(title, body, '<span class="hint">灰色的已经选过了</span><button type="button" class="btn primary" id="pk-ok">添加所选</button>', (w, close) => {
     const picked = new Set();
     const paint = () => {
       const q = $('#pk-q', w).value.trim().toLowerCase(), c = $('#pk-c', w).value;
       $('#pk-list', w).innerHTML = vids.filter(v => (!c || v.category === c) && (!q || `${v.title} ${v.channel}`.toLowerCase().includes(q))).slice(0, 80).map(v => {
-        const inn = have.has(v.id);
+        const inn = alreadyInSet.has(v.id);
         return `<label class="pk ${inn ? 'in' : ''}"><input type="checkbox" value="${E(v.id)}" ${inn ? 'disabled' : ''} ${picked.has(v.id) ? 'checked' : ''}><span class="cov">${cover(v)}</span><span><span class="t">${E(v.title)}</span><br><small>${E(v.channel)} · ${E(v.category)} · ${v.minAge}+</small></span></label>`;
       }).join('') || '<p class="hint">没有匹配的视频。</p>';
     };
     paint();
     $('#pk-q', w).oninput = paint; $('#pk-c', w).onchange = paint;
     $('#pk-list', w).onchange = e => { if (e.target.checked) picked.add(e.target.value); else picked.delete(e.target.value); };
-    $('#pk-ok', w).onclick = () => {
-      const vm = vmap();
-      picked.forEach(id => { const v = vm[id]; st.items.push({id, note: (v && (v.reason || v.title) || '').slice(0, 40)}); });
-      close(); saveNow(); openStages[st.key] = true; renderPath(); if (picked.size) toast(`已添加 ${picked.size} 条`);
-    };
+    $('#pk-ok', w).onclick = () => { close(); if (picked.size) onAdd([...picked]); };
   });
+}
+function openStagePicker(si) {
+  const tr = curTrackObj(), st = tr.stages[si], have = new Set();
+  tr.stages.forEach(s => s.items.forEach(i => have.add(i.id)));
+  pickVideosInto(`给「${st.name}」添加视频`, have, ids => {
+    const vm = vmap();
+    ids.forEach(id => { const v = vm[id]; st.items.push({id, note: (v && (v.reason || v.title) || '').slice(0, 40)}); });
+    saveNow(); openStages[st.key] = true; renderPath(); toast(`已添加 ${ids.length} 条`);
+  });
+}
+
+/* ---------- 学科模式 ---------- */
+function curSubjObj() { return (custom.subjects || []).find(x => x.id === curSubj); }
+function openGroupPicker() {
+  const subj = curSubjObj(), grp = subj.groups.find(x => x.id === curGroup), have = new Set(grp.videoIds);
+  pickVideosInto(`给「${grp.name}」添加视频`, have, ids => {
+    grp.videoIds.push(...ids); saveNow(); renderSubjects(); toast(`已添加 ${ids.length} 条`);
+  });
+}
+function renderSubjects() {
+  if (!custom.subjects) {
+    const bs = BP.baseSubjects();
+    $('#panel').innerHTML = `<h2>📚 学科模式</h2><p class="lead">按真正的学科（语文、数学、英语、科学……）整理视频，每个学科下可以自由加子目录（比如年级、知识点），再往里面放视频。现在 ${E(profile().name)} 用的是公共学科目录（共 ${bs.length} 个学科）。</p>
+    <div class="card"><h3>开始自定义学科目录</h3><div class="acts" style="margin-top:0">
+      <button type="button" class="btn primary" data-act="subjects-start" data-mode="full">复制公共学科目录</button>
+      <button type="button" class="btn" data-act="subjects-start" data-mode="blank">从空白开始</button></div></div>`;
+    return;
+  }
+  const subjects = custom.subjects;
+  if (!curSubj || !subjects.some(s => s.id === curSubj)) curSubj = subjects[0] ? subjects[0].id : '';
+  const subj = subjects.find(s => s.id === curSubj);
+  const subjChips = subjects.map(s => `<button type="button" class="btn sm ${s.id === curSubj ? 'primary' : ''}" data-act="subj-pick" data-sid="${E(s.id)}">${E(s.icon || '📚')} ${E(s.name)}</button>`).join('');
+  let groupsHtml = '';
+  if (subj) {
+    if (!curGroup || !subj.groups.some(g => g.id === curGroup)) curGroup = subj.groups[0] ? subj.groups[0].id : '';
+    const grp = subj.groups.find(g => g.id === curGroup);
+    const vm = vmap();
+    const groupChips = subj.groups.map(g => `<button type="button" class="btn sm ${g.id === curGroup ? 'primary' : ''}" data-act="group-pick" data-gid="${E(g.id)}">${E(g.name)}（${g.videoIds.length}）</button>`).join('');
+    let itemsHtml = '<p class="hint">这个学科还没有子目录，点下面「＋添加子目录」。</p>';
+    if (grp) {
+      const rows = grp.videoIds.map((id, ii) => {
+        const v = vm[id];
+        return `<div class="it"><span class="cov">${cover(v)}</span><div><div class="nt" style="padding:5px 9px;font-size:14px">${v ? E(v.title) + (v.hidden ? '（已隐藏）' : '') : '⚠️ 这条视频已不在清单里，建议删除'}</div>${v ? `<small style="padding:0 9px">${E(v.channel || '')} · ${E(v.category)}</small>` : ''}</div>
+          <div class="mv"><button type="button" data-act="gv-up" data-i="${ii}" aria-label="上移">↑</button><button type="button" data-act="gv-down" data-i="${ii}" aria-label="下移">↓</button><button type="button" class="x" data-act="gv-del" data-i="${ii}" aria-label="删除">✕</button></div></div>`;
+      }).join('') || '<p class="hint">这个子目录还没有视频，点下面「添加视频」。</p>';
+      itemsHtml = `<div class="row"><label class="f wide">子目录名字<input type="text" data-sc="group" data-k="name" value="${E(grp.name || '')}"></label></div>
+        <div class="items">${rows}</div>
+        <div class="acts"><button type="button" class="btn sm primary" data-act="gv-add">＋ 添加视频</button><button type="button" class="btn sm danger" data-act="group-del" data-gid="${E(grp.id)}">删除这个子目录</button></div>`;
+    }
+    groupsHtml = `<div class="card"><div class="row"><label class="f">学科图标<input type="text" data-sc="subject" data-k="icon" value="${E(subj.icon || '')}" maxlength="4"></label>
+      <label class="f wide">学科名字<input type="text" data-sc="subject" data-k="name" value="${E(subj.name || '')}"></label></div>
+      <div class="acts" style="margin-top:10px"><div class="sws" style="gap:6px">${groupChips}</div><button type="button" class="btn sm primary" data-act="group-add">＋添加子目录</button><button type="button" class="btn sm danger" data-act="subj-del" data-sid="${E(subj.id)}">删除这个学科</button></div>
+      <div style="margin-top:12px">${itemsHtml}</div></div>`;
+  }
+  $('#panel').innerHTML = `<h2>📚 学科模式</h2><p class="lead">按学科整理视频：学科 → 子目录（年级 / 知识点）→ 视频。首页和大屏会按这个目录展示，不会自动把改了分类标签的视频显示出来——必须放进这里才会被看到。</p>
+  <div class="card" style="padding:10px 16px"><div class="acts" style="margin:0"><div class="sws" style="gap:6px">${subjChips}</div><button type="button" class="btn sm primary" data-act="subj-add">＋新建学科</button></div></div>
+  ${groupsHtml || '<p class="hint">还没有学科，点上面「＋新建学科」开始。</p>'}
+  <div class="acts"><button type="button" class="btn" data-act="subjects-reset">恢复为公共学科目录</button></div>`;
 }
 
 /* ---------- 视频 ---------- */
@@ -445,7 +488,7 @@ function addVideo() {
   custom.addedVideos.push({id, title, url: 'https://www.bilibili.com/video/' + id, channel: $('#nv-channel').value.trim() || 'UP 主', channelUrl: nvMid ? 'https://space.bilibili.com/' + nvMid : '',
     category: $('#nv-cat').value.trim() || '其他', minAge: +$('#nv-age').value || profile().age, reason: $('#nv-reason').value.trim(), caution: '', cover: nvCover, duration: nvDur});
   nvCover = ''; nvDur = 0; nvMid = 0;
-  saveNow(); vFilter.q = id; renderVideos(); toast('已添加 ✓ 可以去「学习路线」把它放进某一关');
+  saveNow(); vFilter.q = id; renderVideos(); toast('已添加 ✓ 可以去「闯关模式」或「学科模式」把它放进去');
 }
 
 /* ---------- 乐探究 ---------- */
@@ -517,7 +560,7 @@ function renderBackup() {
     <label class="chk" style="margin-top:8px"><input type="checkbox" id="bk-replace">导入前清空这台设备上现有的数据（否则只是覆盖同名内容）</label></div>
   <div class="card"><h3>把设置复制给另一个孩子</h3><div class="row"><label class="f">从<select id="cp-from">${ps.map(p => `<option value="${E(p.id)}" ${p.id === pid ? 'selected' : ''}>${E(p.avatar)} ${E(p.name)}</option>`).join('')}</select></label>
     <label class="f">复制到<select id="cp-to">${ps.map(p => `<option value="${E(p.id)}" ${p.id !== pid ? 'selected' : ''}>${E(p.avatar)} ${E(p.name)}</option>`).join('')}</select></label></div>
-    <div class="acts"><label class="chk"><input type="checkbox" id="cp-path" checked>学习路线</label><label class="chk"><input type="checkbox" id="cp-vid" checked>视频清单改动</label><label class="chk"><input type="checkbox" id="cp-ex" checked>探究题和课题</label><label class="chk"><input type="checkbox" id="cp-wish">心愿清单</label></div>
+    <div class="acts"><label class="chk"><input type="checkbox" id="cp-tracks" checked>闯关模式</label><label class="chk"><input type="checkbox" id="cp-subjects" checked>学科模式</label><label class="chk"><input type="checkbox" id="cp-vid" checked>视频清单改动</label><label class="chk"><input type="checkbox" id="cp-ex" checked>探究题和课题</label><label class="chk"><input type="checkbox" id="cp-wish">心愿清单</label></div>
     <div class="acts"><button type="button" class="btn" id="cp-go">复制（会覆盖对方对应的内容）</button></div></div>
   <div class="card"><h3>重置 ${E(profile().name)}</h3><p class="hint" style="margin-bottom:8px">下面的操作都需要二次确认，做了就找不回来。</p><div class="acts" style="margin-top:0">
     <button type="button" class="btn danger" id="rs-prog">清空学习进度、星星、探究记录</button><button type="button" class="btn danger" id="rs-custom">清空自定义内容（路线、视频改动、课题）</button></div></div>
@@ -531,7 +574,7 @@ function renderBackup() {
 /* ---------- 路由 ---------- */
 function render() {
   paintWho(); paintTabs();
-  ({profile: renderProfile, path: renderPath, videos: renderVideos, explore: renderExplore, rewards: renderRewards, backup: renderBackup})[tab]();
+  ({profile: renderProfile, path: renderPath, subjects: renderSubjects, videos: renderVideos, explore: renderExplore, rewards: renderRewards, backup: renderBackup})[tab]();
 }
 
 /* ---------- 事件 ---------- */
@@ -550,10 +593,12 @@ panel.addEventListener('input', e => {
   if (!sc) return;
   const k = el.dataset.k, s = +el.dataset.s, i = +el.dataset.i;
   const val = el.type === 'checkbox' ? el.checked : el.value;
-  if (sc === 'path') { custom.path[k] = k === 'tips' ? lines(val) : val; }
-  else if (sc === 'stage') { custom.path.stages[s][k] = val; if (k === 'name' || k === 'icon') { const d = el.closest('details'); $('.nm', d).textContent = `第 ${s + 1} 关　${custom.path.stages[s].name}`; $('.ic', d).textContent = custom.path.stages[s].icon || '⭐'; } }
-  else if (sc === 'mission') { const st = custom.path.stages[s]; st.mission = st.mission || {text: '', url: '', label: ''}; st.mission[k] = val; }
-  else if (sc === 'item') { custom.path.stages[s].items[i][k] = val; }
+  if (sc === 'track') { curTrackObj()[k] = k === 'tips' ? lines(val) : val; }
+  else if (sc === 'stage') { const tr = curTrackObj(); tr.stages[s][k] = val; if (k === 'name' || k === 'icon') { const d = el.closest('details'); $('.nm', d).textContent = `第 ${s + 1} 关　${tr.stages[s].name}`; $('.ic', d).textContent = tr.stages[s].icon || '⭐'; } }
+  else if (sc === 'mission') { const st = curTrackObj().stages[s]; st.mission = st.mission || {text: '', url: '', label: ''}; st.mission[k] = val; }
+  else if (sc === 'item') { curTrackObj().stages[s].items[i][k] = val; }
+  else if (sc === 'subject') { curSubjObj()[k] = val; }
+  else if (sc === 'group') { curSubjObj().groups.find(x => x.id === curGroup)[k] = val; }
   else if (sc === 'video') {
     const id = el.dataset.id, v = vmap()[id];
     if (v && v.custom) { const a = custom.addedVideos.filter(x => x.id === id)[0]; a[k] = k === 'minAge' ? (+val || 10) : val; }
@@ -567,7 +612,6 @@ panel.addEventListener('input', e => {
 panel.addEventListener('toggle', e => {
   const d = e.target;
   if (d.matches && d.matches('details.stage[data-key]')) openStages[d.dataset.key] = d.open;
-  else if (d.matches && d.matches('details[data-group]')) openGroups['g-' + d.dataset.group] = d.open;
 }, true);
 panel.addEventListener('change', e => {
   const el = e.target;
@@ -622,7 +666,8 @@ panel.addEventListener('click', e => {
     if (from === to) { toast('请选两个不同的孩子'); return; }
     if (!confirm('会覆盖对方对应的内容，确定吗？')) return;
     const src = BP.getCustom(from), dst = BP.getCustom(to);
-    if ($('#cp-path').checked) dst.path = src.path ? BP.clone(src.path) : null;
+    if ($('#cp-tracks').checked) dst.tracks = src.tracks ? BP.clone(src.tracks) : null;
+    if ($('#cp-subjects').checked) dst.subjects = src.subjects ? BP.clone(src.subjects) : null;
     if ($('#cp-vid').checked) { dst.hiddenVideos = BP.clone(src.hiddenVideos); dst.videoEdits = BP.clone(src.videoEdits); dst.addedVideos = BP.clone(src.addedVideos); }
     if ($('#cp-ex').checked) { dst.exploreByVideo = BP.clone(src.exploreByVideo); dst.quests = BP.clone(src.quests); }
     if ($('#cp-wish').checked) dst.wishes = BP.clone(src.wishes);
@@ -641,22 +686,37 @@ panel.addEventListener('click', e => {
   }
   if (!a) return;
   const act = a.dataset.act, s = +a.dataset.s, i = +a.dataset.i, vid = a.dataset.id;
-  const P = custom.path;
   switch (act) {
-    case 'path-start': {
-      const bp = BP.basePath(), mode = a.dataset.mode;
-      custom.path = mode === 'full' ? bp : mode === 'five' ? Object.assign(bp, {stages: bp.stages.slice(0, 5)}) : {title: '我的学习路线', intro: '', tips: [], stages: []};
+    case 'tracks-start': {
+      const mode = a.dataset.mode;
+      custom.tracks = mode === 'full' ? BP.baseTracks() : [];
+      curTrack = custom.tracks[0] ? custom.tracks[0].id : '';
       saveNow(); renderPath(); break;
     }
-    case 'path-reset': if (confirm('换回公共路线？你对路线做的所有修改都会丢掉（看完的进度不受影响）。')) { custom.path = null; saveNow(); renderPath(); } break;
-    case 'st-add': P.stages.push({key: 'c' + Date.now().toString(36), subject: '未分类', icon: '⭐', name: '新的一关', age: '', goal: '', items: [], mission: {text: '', url: '', label: ''}}); openStages[P.stages[P.stages.length - 1].key] = true; saveNow(); renderPath(); break;
-    case 'st-del': if (confirm(`删除「${P.stages[s].name}」这一关？`)) { P.stages.splice(s, 1); saveNow(); renderPath(); } break;
-    case 'st-up': move(P.stages, s, -1); saveNow(); renderPath(); break;
-    case 'st-down': move(P.stages, s, 1); saveNow(); renderPath(); break;
-    case 'it-up': move(P.stages[s].items, i, -1); saveNow(); renderPath(); break;
-    case 'it-down': move(P.stages[s].items, i, 1); saveNow(); renderPath(); break;
-    case 'it-del': P.stages[s].items.splice(i, 1); saveNow(); renderPath(); break;
-    case 'it-add': openPicker(s); break;
+    case 'tracks-reset': if (confirm('恢复所有闯关为公共版本？你对闯关路线做的所有修改都会丢掉（看完的进度不受影响）。')) { custom.tracks = null; curTrack = ''; saveNow(); renderPath(); } break;
+    case 'track-pick': curTrack = a.dataset.tid; renderPath(); break;
+    case 'track-add': { const nt = {id: 'c' + Date.now().toString(36), icon: '⭐', title: '新的闯关', intro: '', tips: [], stages: []}; custom.tracks = custom.tracks || []; custom.tracks.push(nt); curTrack = nt.id; saveNow(); renderPath(); break; }
+    case 'track-del': { const tid = a.dataset.tid, tr = custom.tracks.find(x => x.id === tid); if (tr && confirm(`删除「${tr.title}」这条闯关？`)) { custom.tracks = custom.tracks.filter(x => x.id !== tid); if (curTrack === tid) curTrack = ''; saveNow(); renderPath(); } break; }
+    case 'st-add': { const tr = curTrackObj(); tr.stages.push({key: 'c' + Date.now().toString(36), icon: '⭐', name: '新的一关', age: '', goal: '', items: [], mission: {text: '', url: '', label: ''}}); openStages[tr.stages[tr.stages.length - 1].key] = true; saveNow(); renderPath(); break; }
+    case 'st-del': { const tr = curTrackObj(); if (confirm(`删除「${tr.stages[s].name}」这一关？`)) { tr.stages.splice(s, 1); saveNow(); renderPath(); } break; }
+    case 'st-up': move(curTrackObj().stages, s, -1); saveNow(); renderPath(); break;
+    case 'st-down': move(curTrackObj().stages, s, 1); saveNow(); renderPath(); break;
+    case 'it-up': move(curTrackObj().stages[s].items, i, -1); saveNow(); renderPath(); break;
+    case 'it-down': move(curTrackObj().stages[s].items, i, 1); saveNow(); renderPath(); break;
+    case 'it-del': curTrackObj().stages[s].items.splice(i, 1); saveNow(); renderPath(); break;
+    case 'it-add': openStagePicker(s); break;
+    case 'subjects-start': { const mode = a.dataset.mode; custom.subjects = mode === 'full' ? BP.baseSubjects() : []; curSubj = custom.subjects[0] ? custom.subjects[0].id : ''; curGroup = ''; saveNow(); renderSubjects(); break; }
+    case 'subjects-reset': if (confirm('恢复为公共学科目录？你对学科做的所有修改都会丢掉。')) { custom.subjects = null; curSubj = ''; curGroup = ''; saveNow(); renderSubjects(); } break;
+    case 'subj-pick': curSubj = a.dataset.sid; curGroup = ''; renderSubjects(); break;
+    case 'subj-add': { const ns = {id: 's' + Date.now().toString(36), icon: '📚', name: '新学科', groups: []}; custom.subjects = custom.subjects || []; custom.subjects.push(ns); curSubj = ns.id; curGroup = ''; saveNow(); renderSubjects(); break; }
+    case 'subj-del': { const sid = a.dataset.sid, sj = custom.subjects.find(x => x.id === sid); if (sj && confirm(`删除「${sj.name}」这个学科？`)) { custom.subjects = custom.subjects.filter(x => x.id !== sid); if (curSubj === sid) { curSubj = ''; curGroup = ''; } saveNow(); renderSubjects(); } break; }
+    case 'group-pick': curGroup = a.dataset.gid; renderSubjects(); break;
+    case 'group-add': { const subj = curSubjObj(); if (!subj) break; const ng = {id: 'g' + Date.now().toString(36), name: '新子目录', videoIds: []}; subj.groups.push(ng); curGroup = ng.id; saveNow(); renderSubjects(); break; }
+    case 'group-del': { const subj = curSubjObj(), gid = a.dataset.gid, g = subj.groups.find(x => x.id === gid); if (g && confirm(`删除「${g.name}」这个子目录？`)) { subj.groups = subj.groups.filter(x => x.id !== gid); if (curGroup === gid) curGroup = ''; saveNow(); renderSubjects(); } break; }
+    case 'gv-add': openGroupPicker(); break;
+    case 'gv-up': move(curSubjObj().groups.find(x => x.id === curGroup).videoIds, i, -1); saveNow(); renderSubjects(); break;
+    case 'gv-down': move(curSubjObj().groups.find(x => x.id === curGroup).videoIds, i, 1); saveNow(); renderSubjects(); break;
+    case 'gv-del': curSubjObj().groups.find(x => x.id === curGroup).videoIds.splice(i, 1); saveNow(); renderSubjects(); break;
     case 'v-edit': openVideo = openVideo === vid ? '' : vid; renderVideos(); break;
     case 'v-hide': if (custom.hiddenVideos[vid]) delete custom.hiddenVideos[vid]; else custom.hiddenVideos[vid] = true; saveNow(); renderVideos(); break;
     case 'v-del': if (confirm('删除这条自己加的视频？')) { custom.addedVideos = custom.addedVideos.filter(x => x.id !== vid); delete custom.hiddenVideos[vid]; openVideo = ''; saveNow(); renderVideos(); } break;
