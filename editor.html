@@ -523,6 +523,8 @@ function renderBackup() {
     <button type="button" class="btn danger" id="rs-prog">清空学习进度、星星、探究记录</button><button type="button" class="btn danger" id="rs-custom">清空自定义内容（路线、视频改动、课题）</button></div></div>
   <div class="card"><h3>发布到线上用的令牌</h3><p class="hint" style="margin-bottom:8px">点顶栏「发布到线上」时会问这个令牌，这里可以重新设置或者清除。</p>
     <div class="acts" style="margin-top:0"><button type="button" class="btn" id="gh-token-set">${BP.jget('bp2-gh-token', '') ? '更改令牌' : '设置令牌'}</button>${BP.jget('bp2-gh-token', '') ? '<button type="button" class="btn danger" id="gh-token-clear">清除令牌</button>' : ''}</div></div>
+  <div class="card"><h3>强制同步最新发布数据</h3><p class="hint" style="margin-bottom:8px">如果在别的设备上发布过改动，但这台设备一直看不到变化（比如这台设备很早之前就打开过网站，档案名字还是旧的），点这个按钮会用线上最新发布的数据覆盖这台设备上对应的内容。<b>这台设备上还没发布过的本地改动会被覆盖丢失</b>，操作前最好先导出一份备份。</p>
+    <div class="acts" style="margin-top:0"><button type="button" class="btn danger" id="sync-published">强制同步</button></div></div>
   <div class="card"><h3>想让所有孩子共用某条视频？</h3><p class="hint">这里添加的视频只属于当前孩子。要加进公共清单，在电脑上用原项目自带的脚本：<br><code>python3 update.py add BV号 --cat 分类 --age 9 --reason "推荐理由"</code><br>它会写进 <code>data.js</code>，再重新部署网站即可。</p></div>`;
 }
 
@@ -606,6 +608,15 @@ panel.addEventListener('click', e => {
     return;
   }
   if (id === 'gh-token-clear') { BP.jset('bp2-gh-token', ''); renderBackup(); toast('已清除'); return; }
+  if (id === 'sync-published') {
+    if (!confirm('用线上最新发布的数据覆盖这台设备？这台设备上还没发布过的改动会丢失，无法撤销。')) return;
+    const btn = e.target; btn.disabled = true; btn.textContent = '同步中…';
+    BP.syncFromPublished().then(res => {
+      if (res.ok) { toast(`已同步 ${res.n} 项，即将刷新页面`); setTimeout(() => location.reload(), 900); }
+      else { btn.disabled = false; btn.textContent = '强制同步'; toast('同步失败：' + (res.msg || '未知错误')); }
+    });
+    return;
+  }
   if (id === 'cp-go') {
     const from = $('#cp-from').value, to = $('#cp-to').value;
     if (from === to) { toast('请选两个不同的孩子'); return; }

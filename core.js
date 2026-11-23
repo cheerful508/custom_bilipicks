@@ -749,6 +749,42 @@ BP.importAll = function (obj, replace) {
   } catch (e) { return {ok: false, msg: '写入失败：' + e.message}; }
 };
 
+/* ---------- 强制同步最新发布数据 ----------
+ * 用途：有些设备在"发布"发生之前就已经打开过网站，jget() 的"localStorage 没有才用发布数据"
+ * 逻辑会让它们永远锁定当时读到的旧值，之后再怎么发布都看不到变化。这个函数绕过 jget，
+ * 直接把当前能拿到的最新发布数据写进本机 localStorage，让这台设备"追上"线上版本。
+ * 为了不被浏览器缓存的 profiles-data.js 坑（和发布时同一个坑），优先用 cache:'no-store'
+ * 重新拉一次最新文件；拉不到（比如用 file:// 本地打开）就退回用页面已加载的 BP_PUBLISHED。 */
+BP.syncFromPublished = function () {
+  function applyItems(items) {
+    var n = 0;
+    try {
+      for (var k in items) {
+        if (k.indexOf('bp2-') === 0 && typeof items[k] === 'string') { localStorage.setItem(k, items[k]); n++; }
+      }
+    } catch (e) { return {ok: false, msg: '写入失败：' + e.message}; }
+    return {ok: true, n: n};
+  }
+  function fromMemory() {
+    var pub = global.BP_PUBLISHED;
+    if (!pub || !pub.items) return {ok: false, msg: '没有找到已发布的数据'};
+    return applyItems(pub.items);
+  }
+  try {
+    return fetch('profiles-data.js?_=' + Date.now(), {cache: 'no-store'}).then(function (r) {
+      if (!r.ok) return fromMemory();
+      return r.text().then(function (text) {
+        var m = /window\.BP_PUBLISHED\s*=\s*(\{[\s\S]*\});?/.exec(text);
+        if (!m) return fromMemory();
+        var pub;
+        try { pub = JSON.parse(m[1]); } catch (e) { return fromMemory(); }
+        if (!pub || !pub.items) return fromMemory();
+        return applyItems(pub.items);
+      });
+    }).catch(fromMemory);
+  } catch (e) { return Promise.resolve(fromMemory()); }
+};
+
 /* ---------- 一键发布到线上（把本机数据推到 GitHub，Cloudflare Pages 自动重新部署） ---------- */
 BP.GH_REPO = {owner: 'cheerful508', repo: 'custom_bilipicks', branch: 'main', path: 'profiles-data.js'};
 function b64encode(str) {

@@ -37,7 +37,8 @@ function renderProfileMenu() {
   }).join('') + '<hr><button type="button" class="pm-link" data-pm="me">🏆 我的成长</button><button type="button" class="pm-link" data-pm="explore">🔬 乐探究</button>' +
     '<a class="pm-link" href="editor.html#profile">✏️ 编辑我的页面</a>' +
     '<a class="pm-link" href="tv.html">📺 大屏版</a>' +
-    '<button type="button" class="pm-link" data-pm="sound">' + (BP.profile().sound === false ? '🔇 音效：关' : '🔊 音效：开') + '</button>';
+    '<button type="button" class="pm-link" data-pm="sound">' + (BP.profile().sound === false ? '🔇 音效：关' : '🔊 音效：开') + '</button>' +
+    '<button type="button" class="pm-link" data-pm="sync">⬇️ 强制同步最新发布数据</button>';
 }
 function switchProfile(id) {
   BP.setCurrent(id);
@@ -232,6 +233,15 @@ function kidsInit() {
         BP.updateProfile(p.id, {sound: p.sound === false});
         renderProfileMenu();
         if (BP.profile().sound !== false) BP.sound('ok');
+        return;
+      }
+      if (k === 'sync') {
+        if (!confirm('用线上最新发布的数据覆盖这台设备？这台设备上还没发布过的改动会丢失，无法撤销。')) return;
+        closeMenu(); toast('同步中…');
+        BP.syncFromPublished().then(function (res) {
+          if (res.ok) { toast('已同步 ' + res.n + ' 项，即将刷新页面'); setTimeout(function () { location.reload(); }, 900); }
+          else { toast('同步失败：' + (res.msg || '未知错误')); }
+        });
         return;
       }
       closeMenu(); go(k);

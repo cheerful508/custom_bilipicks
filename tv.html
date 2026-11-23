@@ -434,6 +434,14 @@ function openSettings() {
     act: function () { setRemoteMode(seekMode() ? 'switch' : 'seek'); openSettings(); }});
   items.push({html: '<span class="pav">✏️</span><span class="px"><b>打开编辑器</b><small>改路线、视频、探究题、奖励（可能需要家长口令）</small></span>', act: function () { location.href = 'editor.html'; }});
   items.push({html: '<span class="pav">🔄</span><span class="px"><b>刷新页面</b><small>在编辑器里改完内容后，回来点这里</small></span>', act: function () { location.reload(); }});
+  items.push({html: '<span class="pav">⬇️</span><span class="px"><b>强制同步最新发布数据</b><small>这台设备一直看不到别处发布的改动时用，会覆盖本机未发布的内容</small></span>', act: function () {
+    if (!confirm('用线上最新发布的数据覆盖这台设备？这台设备上还没发布过的改动会丢失，无法撤销。')) return;
+    toast('同步中…', 60000);
+    BP.syncFromPublished().then(function (res) {
+      if (res.ok) { toast('已同步 ' + res.n + ' 项，即将刷新页面', 1500); setTimeout(function () { location.reload(); }, 900); }
+      else { toast('同步失败：' + (res.msg || '未知错误'), 2500); }
+    });
+  }});
   items.push({html: '<span class="pav">🖥️</span><span class="px"><b>切到网页版</b><small>完整功能：路线、频道榜、动手任务</small></span>', act: function () { location.href = 'index.html'; }});
   openPanel({title: '设置 · ' + p.name, closable: true, items: items});
 }
