@@ -177,8 +177,19 @@ const TABS = [['profile', '👤', '档案'], ['path', '🗺️', '学习路线']
   let ok = false;
   try { ok = sessionStorage.getItem('bp2-editor-ok') === '1'; } catch (e) {}
   if (BP.pin() && !ok) {
-    if (!BP.askPin('进入编辑器需要家长口令')) { location.replace('index.html'); throw new Error('locked'); }
-    try { sessionStorage.setItem('bp2-editor-ok', '1'); } catch (e) {}
+    const v = prompt('进入编辑器需要家长口令');
+    if (v !== null && String(v) === BP.pin()) {
+      try { sessionStorage.setItem('bp2-editor-ok', '1'); } catch (e) {}
+      return;
+    }
+    const forget = confirm((v === null ? '已取消。' : '口令不对。') +
+      '\n\n这个口令只是防止孩子不小心点进编辑器，不是真正的安全措施。如果忘记了，可以直接清除。\n\n要现在清除口令、直接进入编辑器吗？');
+    if (forget) {
+      BP.setPin('');
+      try { sessionStorage.setItem('bp2-editor-ok', '1'); } catch (e) {}
+    } else {
+      location.replace('index.html'); throw new Error('locked');
+    }
   }
 })();
 

@@ -723,12 +723,14 @@ BP.openExplore = function (opt) {
 };
 
 /* ---------- 备份与恢复（编辑器用） ---------- */
+// 这台设备本机专用、绝不能导出/发布/同步到别的地方的 key（令牌一旦进了 git 历史就作废了也得换）
+var NEVER_EXPORT = {'bp2-gh-token': true};
 BP.exportAll = function () {
   var items = {};
   try {
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
-      if (k && k.indexOf('bp2-') === 0) items[k] = localStorage.getItem(k);
+      if (k && k.indexOf('bp2-') === 0 && !NEVER_EXPORT[k]) items[k] = localStorage.getItem(k);
     }
   } catch (e) {}
   return {app: 'bilipicks-kids', version: 2, exported: new Date().toISOString(), items: items};
@@ -792,10 +794,11 @@ BP.publish = function (token) {
       return readJson(r).then(function (j) { pubLog('PUT 失败', r.status, j); return Promise.reject({status: r.status, msg: j.message}); });
     });
   }
+  function isSecretBlock(e) { return e && e.status === 409 && /secret/i.test(e.msg || ''); }
   function attempt(n) {
     pubLog('第 ' + (n + 1) + ' 次尝试');
     return getSha().then(put).catch(function (e) {
-      if (e && e.status === 409 && n < 2) { pubLog('409 冲突，重试'); return attempt(n + 1); }
+      if (e && e.status === 409 && !isSecretBlock(e) && n < 2) { pubLog('409 冲突，重试'); return attempt(n + 1); }
       return Promise.reject(e);
     });
   }
@@ -808,6 +811,7 @@ BP.publish = function (token) {
     var status = e && e.status, msg = e && e.msg;
     if (status === 401) return {ok: false, msg: '令牌不对或已过期，去 GitHub 重新生成一个'};
     if (status === 403) return {ok: false, msg: '这个令牌没有这个仓库的写入权限'};
+    if (isSecretBlock(e)) return {ok: false, msg: 'GitHub 拦截了这次发布：内容里检测到疑似密钥/令牌，不会写入仓库。这不是版本冲突，重试没用，请把日志发给开发者看看'};
     if (status === 409) return {ok: false, msg: '版本有冲突，已经自动重试了几次还是不行，刷新页面后再试一次'};
     if (status) return {ok: false, msg: '发布失败（' + status + '）' + (msg ? '：' + msg : '')};
     return {ok: false, msg: '网络错误，请检查网络后重试（' + ((e && e.message) || e) + '）'};
