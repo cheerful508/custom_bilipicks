@@ -753,43 +753,64 @@ function b64encode(str) {
   var bytes = encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (_, p) { return String.fromCharCode(parseInt(p, 16)); });
   return global.btoa(bytes);
 }
+var pubLogLines = [];
+function pubLog() {
+  var bits = [];
+  for (var i = 0; i < arguments.length; i++) {
+    var a = arguments[i];
+    bits.push(typeof a === 'object' && a != null ? JSON.stringify(a) : String(a));
+  }
+  var line = '[' + new Date().toTimeString().slice(0, 8) + '] ' + bits.join(' ');
+  pubLogLines.push(line);
+  if (global.console && console.debug) console.debug('[BP.publish]', line);
+}
+BP.publishLog = function () { return pubLogLines.join('\n'); };
 BP.publish = function (token) {
+  pubLogLines = [];
   var R = BP.GH_REPO;
   var api = 'https://api.github.com/repos/' + R.owner + '/' + R.repo + '/contents/' + R.path;
   var headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'};
   var content = b64encode('window.BP_PUBLISHED = ' + JSON.stringify(BP.exportAll()) + ';\n');
   function readJson(r) { return r.json().catch(function () { return {}; }); }
   function getSha() {
-    return fetch(api + '?ref=' + R.branch, {headers: headers}).then(function (r) {
+    pubLog('GET sha 开始');
+    // cache:'no-store' + 时间戳防止浏览器用上一次发布之前缓存的旧响应，导致 sha 一直是旧的、PUT 永远 409
+    return fetch(api + '?ref=' + R.branch + '&_=' + Date.now(), {headers: headers, cache: 'no-store'}).then(function (r) {
+      pubLog('GET sha 返回', r.status);
       if (r.status === 404) return null;
-      if (!r.ok) return readJson(r).then(function (j) { return Promise.reject({status: r.status, msg: j.message}); });
-      return readJson(r).then(function (j) { return j.sha; });
+      if (!r.ok) return readJson(r).then(function (j) { pubLog('GET sha 失败', r.status, j); return Promise.reject({status: r.status, msg: j.message}); });
+      return readJson(r).then(function (j) { pubLog('GET sha 成功', j.sha); return j.sha; });
     });
   }
   function put(sha) {
+    pubLog('PUT 开始，用的 sha =', sha);
     var body = {message: '发布：' + ymd() + ' ' + new Date().toTimeString().slice(0, 8), content: content, branch: R.branch};
     if (sha) body.sha = sha;
-    return fetch(api, {method: 'PUT', headers: headers, body: JSON.stringify(body)}).then(function (r) {
+    return fetch(api, {method: 'PUT', headers: headers, body: JSON.stringify(body), cache: 'no-store'}).then(function (r) {
+      pubLog('PUT 返回', r.status);
       if (r.ok) return {ok: true};
-      return readJson(r).then(function (j) { return Promise.reject({status: r.status, msg: j.message}); });
+      return readJson(r).then(function (j) { pubLog('PUT 失败', r.status, j); return Promise.reject({status: r.status, msg: j.message}); });
     });
   }
-  function attempt(retrying) {
+  function attempt(n) {
+    pubLog('第 ' + (n + 1) + ' 次尝试');
     return getSha().then(put).catch(function (e) {
-      if (e && e.status === 409 && !retrying) return attempt(true);
+      if (e && e.status === 409 && n < 2) { pubLog('409 冲突，重试'); return attempt(n + 1); }
       return Promise.reject(e);
     });
   }
-  return attempt(false).then(function (res) {
+  return attempt(0).then(function (res) {
+    pubLog('发布成功');
     jset('bp2-last-published', new Date().toISOString());
     return res;
   }).catch(function (e) {
+    pubLog('发布失败，最终结果', e);
     var status = e && e.status, msg = e && e.msg;
     if (status === 401) return {ok: false, msg: '令牌不对或已过期，去 GitHub 重新生成一个'};
     if (status === 403) return {ok: false, msg: '这个令牌没有这个仓库的写入权限'};
-    if (status === 409) return {ok: false, msg: '版本有冲突，请再点一次发布'};
+    if (status === 409) return {ok: false, msg: '版本有冲突，已经自动重试了几次还是不行，刷新页面后再试一次'};
     if (status) return {ok: false, msg: '发布失败（' + status + '）' + (msg ? '：' + msg : '')};
-    return {ok: false, msg: '网络错误，请检查网络后重试'};
+    return {ok: false, msg: '网络错误，请检查网络后重试（' + ((e && e.message) || e) + '）'};
   });
 };
 

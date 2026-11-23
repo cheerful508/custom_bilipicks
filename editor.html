@@ -36,6 +36,10 @@ h1,h2,h3,p{margin:0}
 .pubstat.ok{color:var(--ok)}
 .pubstat.err{color:var(--bad)}
 .pubstat.busy{color:var(--muted)}
+.publog{max-width:960px;margin:0 auto 14px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.publog-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.publog-bar b{flex:1;font-size:13px}
+.publog textarea{width:100%;height:140px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
 
 .wrap{max-width:1120px;margin:0 auto;padding:16px 20px 60px;display:grid;grid-template-columns:190px minmax(0,1fr);gap:20px;align-items:start}
 .tabs{position:sticky;top:78px;display:grid;gap:4px}
@@ -150,6 +154,10 @@ table.rules td:last-child{text-align:right;font-weight:800;white-space:nowrap}
   <span class="pubstat" id="pubstat" role="status"></span>
   <span class="saved" id="saved" role="status">已自动保存 ✓</span>
 </header>
+<div class="publog" id="publog" hidden>
+  <div class="publog-bar"><b>发布调试日志（出问题时复制这段发给我）</b><button type="button" class="btn sm" id="publog-copy">复制日志</button><button type="button" class="btn sm" id="publog-close">关闭</button></div>
+  <textarea id="publog-text" readonly></textarea>
+</div>
 <div class="wrap">
   <nav class="tabs" id="tabs" aria-label="编辑内容"></nav>
   <main class="panel" id="panel"></main>
@@ -234,7 +242,16 @@ $('#btn-publish').onclick = async () => {
   btn.disabled = false;
   if (res.ok) { s.className = 'pubstat ok'; s.textContent = '✅ 已发布 · ' + new Date().toLocaleTimeString() + ' · Cloudflare 大约 1 分钟后更新'; }
   else { s.className = 'pubstat err'; s.textContent = '❌ ' + res.msg; }
+  $('#publog-text').value = BP.publishLog();
+  $('#publog').hidden = res.ok;
 };
+$('#publog-copy').onclick = async () => {
+  const text = $('#publog-text'), btn = $('#publog-copy');
+  text.focus(); text.select();
+  try { await navigator.clipboard.writeText(text.value); } catch (e) { document.execCommand('copy'); }
+  const old = btn.textContent; btn.textContent = '已复制 ✓'; setTimeout(() => { btn.textContent = old; }, 1500);
+};
+$('#publog-close').onclick = () => { $('#publog').hidden = true; };
 function paintTabs() {
   $('#tabs').innerHTML = TABS.map(t => `<button type="button" data-tab="${t[0]}" class="${t[0] === tab ? 'on' : ''}"><span>${t[1]}</span>${t[2]}</button>`).join('');
 }
