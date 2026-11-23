@@ -1,4 +1,1 @@
-/* 由编辑器「发布到线上」自动生成和覆盖，不要手动改。
- * 没有发布过的数据，页面会继续用代码里写死的默认值。
- */
-window.BP_PUBLISHED = {"app": "bilipicks-kids", "version": 2, "exported": null, "items": {}};
+window.BP_PUBLISHED = {"app":"bilipicks-kids","version":2,"exported":"2026-11-23T06:33:25.330Z","items":{"bp2-pin":"\"\"","bp2-p1-custom":"{\"hiddenVideos\":{},\"videoEdits\":{},\"addedVideos\":[],\"path\":null,\"exploreByVideo\":{},\"quests\":[],\"wishes\":[{\"id\":\"w1\",\"emoji\":\"🎮\",\"name\":\"周末多玩 30 分钟游戏\",\"cost\":30},{\"id\":\"w2\",\"emoji\":\"🍦\",\"name\":\"一次冰淇淋或奶茶\",\"cost\":40},{\"id\":\"w3\",\"emoji\":\"🎬\",\"name\":\"家庭电影夜（自己选片）\",\"cost\":60},{\"id\":\"w4\",\"emoji\":\"🧩\",\"name\":\"挑一份新的手工 / 科学材料包\",\"cost\":90},{\"id\":\"w5\",\"emoji\":\"🏞️\",\"name\":\"周末探险日（自己定去哪儿）\",\"cost\":150}]}","bp2-current":"\"p1\"","bp2-profiles":"[{\"id\":\"p1\",\"name\":\"Sean\",\"avatar\":\"🦊\",\"age\":11,\"theme\":\"#2f86e0\",\"slogan\":\"好奇心就是我的超能力\",\"goal\":2,\"sound\":true},{\"id\":\"p2\",\"name\":\"弟弟\",\"avatar\":\"🐼\",\"age\":9,\"theme\":\"#2fa866\",\"slogan\":\"每天进步一点点\",\"goal\":2,\"sound\":true}]"}};
