@@ -386,21 +386,59 @@ function openStagePicker(si) {
   });
 }
 
-/* ---------- 学科模式 ---------- */
+/* ---------- 学科模式（学科 → 多级文件夹 → 视频） ---------- */
 function curSubjObj() { return (custom.subjects || []).find(x => x.id === curSubj); }
+const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+// 在一个学科的文件夹树里按 id 找文件夹：返回 {g 文件夹, list 它所在的兄弟列表, i 序号, depth 层级, names 从学科往下的名字}
+function findGroup(subj, gid) {
+  let found = null;
+  (function walk(list, depth, names) {
+    for (let i = 0; i < list.length && !found; i++) {
+      const g = list[i], nm = names.concat(g.name || '');
+      if (g.id === gid) { g.videoIds = g.videoIds || []; found = {g, list, i, depth, names: nm}; return; }
+      walk(g.children || [], depth + 1, nm);
+    }
+  })(subj.groups || [], 0, []);
+  return found;
+}
+function curGrp() { const sj = curSubjObj(); return sj && curGroup ? findGroup(sj, curGroup) : null; }
+function flatGroups(subj) {
+  const out = [];
+  (function walk(list, depth) { list.forEach(g => { out.push({g, depth}); walk(g.children || [], depth + 1); }); })(subj.groups || [], 0);
+  return out;
+}
+const countGroup = g => (g.videoIds || []).length + (g.children || []).reduce((n, c) => n + countGroup(c), 0);
+const mkGroup = (name, children) => { const g = {id: newId('g'), name, videoIds: []}; if (children && children.length) g.children = children; return g; };
+function mathTemplate() {
+  const names = a => a.map(n => mkGroup(n));
+  return {id: newId('s'), icon: '🔢', name: '数学', groups: [
+    mkGroup('小学', names(['一年级', '二年级', '三年级', '四年级', '五年级', '六年级'])),
+    mkGroup('初中', names(['七年级', '八年级', '九年级'])),
+    mkGroup('思维拓展', names(['趣味数学', '数学思维']))
+  ]};
+}
+function addMathTemplate() {
+  custom.subjects = custom.subjects || BP.baseSubjects();
+  const have = custom.subjects.find(x => x.name === '数学');
+  if (have) { curSubj = have.id; curGroup = ''; saveNow(); renderSubjects(); toast('已经有「数学」了，直接在里面加文件夹吧'); return; }
+  const m = mathTemplate();
+  custom.subjects.push(m); curSubj = m.id; curGroup = m.groups[0].id; saveNow(); renderSubjects();
+  toast('已添加「数学」：小学 / 初中 / 思维拓展，文件夹名字都可以改');
+}
 function openGroupPicker() {
-  const subj = curSubjObj(), grp = subj.groups.find(x => x.id === curGroup), have = new Set(grp.videoIds);
-  pickVideosInto(`给「${grp.name}」添加视频`, have, ids => {
-    grp.videoIds.push(...ids); saveNow(); renderSubjects(); toast(`已添加 ${ids.length} 条`);
+  const gr = curGrp(), have = new Set(gr.g.videoIds);
+  pickVideosInto(`给「${gr.g.name}」添加视频`, have, ids => {
+    gr.g.videoIds.push(...ids); saveNow(); renderSubjects(); toast(`已添加 ${ids.length} 条`);
   });
 }
 function renderSubjects() {
+  const tplBtn = '<button type="button" class="btn" data-act="subj-math">＋ 添加「数学」模板</button>';
   if (!custom.subjects) {
     const bs = BP.baseSubjects();
-    $('#panel').innerHTML = `<h2>📚 学科模式</h2><p class="lead">按真正的学科（语文、数学、英语、科学……）整理视频，每个学科下可以自由加子目录（比如年级、知识点），再往里面放视频。现在 ${E(profile().name)} 用的是公共学科目录（共 ${bs.length} 个学科）。</p>
+    $('#panel').innerHTML = `<h2>📚 学科模式</h2><p class="lead">按真正的学科（语文、数学、英语、科学……）整理视频，每个学科下可以建多级文件夹（比如 小学 → 三年级 → 分数），再往里面放视频。现在 ${E(profile().name)} 用的是公共学科目录（共 ${bs.length} 个学科）。</p>
     <div class="card"><h3>开始自定义学科目录</h3><div class="acts" style="margin-top:0">
       <button type="button" class="btn primary" data-act="subjects-start" data-mode="full">复制公共学科目录</button>
-      <button type="button" class="btn" data-act="subjects-start" data-mode="blank">从空白开始</button></div></div>`;
+      <button type="button" class="btn" data-act="subjects-start" data-mode="blank">从空白开始</button>${tplBtn}</div></div>`;
     return;
   }
   const subjects = custom.subjects;
@@ -409,28 +447,34 @@ function renderSubjects() {
   const subjChips = subjects.map(s => `<button type="button" class="btn sm ${s.id === curSubj ? 'primary' : ''}" data-act="subj-pick" data-sid="${E(s.id)}">${E(s.icon || '📚')} ${E(s.name)}</button>`).join('');
   let groupsHtml = '';
   if (subj) {
-    if (!curGroup || !subj.groups.some(g => g.id === curGroup)) curGroup = subj.groups[0] ? subj.groups[0].id : '';
-    const grp = subj.groups.find(g => g.id === curGroup);
-    const vm = vmap();
-    const groupChips = subj.groups.map(g => `<button type="button" class="btn sm ${g.id === curGroup ? 'primary' : ''}" data-act="group-pick" data-gid="${E(g.id)}">${E(g.name)}（${g.videoIds.length}）</button>`).join('');
-    let itemsHtml = '<p class="hint">这个学科还没有子目录，点下面「＋添加子目录」。</p>';
-    if (grp) {
-      const rows = grp.videoIds.map((id, ii) => {
+    subj.groups = subj.groups || [];
+    if (!curGroup || !findGroup(subj, curGroup)) curGroup = subj.groups[0] ? subj.groups[0].id : '';
+    const gr = curGrp(), vm = vmap();
+    const tree = flatGroups(subj).map(({g, depth}) => `<div style="margin:3px 0 3px ${depth * 20}px"><button type="button" class="btn sm ${g.id === curGroup ? 'primary' : ''}" data-act="group-pick" data-gid="${E(g.id)}">${(g.children || []).length ? '📂' : '📁'} ${E(g.name)}（${countGroup(g)}）</button></div>`).join('');
+    let itemsHtml = '<p class="hint">这个学科还没有文件夹，点下面「＋添加一级文件夹」。</p>';
+    if (gr) {
+      const g = gr.g;
+      const rows = g.videoIds.map((id, ii) => {
         const v = vm[id];
         return `<div class="it"><span class="cov">${cover(v)}</span><div><div class="nt" style="padding:5px 9px;font-size:14px">${v ? E(v.title) + (v.hidden ? '（已隐藏）' : '') : '⚠️ 这条视频已不在清单里，建议删除'}</div>${v ? `<small style="padding:0 9px">${E(v.channel || '')} · ${E(v.category)}</small>` : ''}</div>
           <div class="mv"><button type="button" data-act="gv-up" data-i="${ii}" aria-label="上移">↑</button><button type="button" data-act="gv-down" data-i="${ii}" aria-label="下移">↓</button><button type="button" class="x" data-act="gv-del" data-i="${ii}" aria-label="删除">✕</button></div></div>`;
-      }).join('') || '<p class="hint">这个子目录还没有视频，点下面「添加视频」。</p>';
-      itemsHtml = `<div class="row"><label class="f wide">子目录名字<input type="text" data-sc="group" data-k="name" value="${E(grp.name || '')}"></label></div>
+      }).join('') || '<p class="hint">这个文件夹自己还没有视频，点下面「添加视频」。</p>';
+      const sub = (g.children || []).length;
+      itemsHtml = `<p class="hint" style="margin:0 0 8px">位置：${E([subj.name].concat(gr.names).join(' › '))}${sub ? `　（下面还有 ${sub} 个子文件夹，大屏上选它会一起显示）` : ''}</p>
+        <div class="row"><label class="f wide">文件夹名字<input type="text" data-sc="group" data-k="name" value="${E(g.name || '')}"></label></div>
         <div class="items">${rows}</div>
-        <div class="acts"><button type="button" class="btn sm primary" data-act="gv-add">＋ 添加视频</button><button type="button" class="btn sm danger" data-act="group-del" data-gid="${E(grp.id)}">删除这个子目录</button></div>`;
+        <div class="acts"><button type="button" class="btn sm primary" data-act="gv-add">＋ 添加视频</button><button type="button" class="btn sm primary" data-act="group-add-child">＋ 添加子文件夹</button>
+          <button type="button" class="btn sm" data-act="group-up"${gr.i === 0 ? ' disabled' : ''}>↑ 上移</button><button type="button" class="btn sm" data-act="group-down"${gr.i >= gr.list.length - 1 ? ' disabled' : ''}>↓ 下移</button>
+          <button type="button" class="btn sm danger" data-act="group-del" data-gid="${E(g.id)}">删除这个文件夹</button></div>`;
     }
     groupsHtml = `<div class="card"><div class="row"><label class="f">学科图标<input type="text" data-sc="subject" data-k="icon" value="${E(subj.icon || '')}" maxlength="4"></label>
       <label class="f wide">学科名字<input type="text" data-sc="subject" data-k="name" value="${E(subj.name || '')}"></label></div>
-      <div class="acts" style="margin-top:10px"><div class="sws" style="gap:6px">${groupChips}</div><button type="button" class="btn sm primary" data-act="group-add">＋添加子目录</button><button type="button" class="btn sm danger" data-act="subj-del" data-sid="${E(subj.id)}">删除这个学科</button></div>
-      <div style="margin-top:12px">${itemsHtml}</div></div>`;
+      <div style="margin-top:12px">${tree}</div>
+      <div class="acts" style="margin-top:10px"><button type="button" class="btn sm primary" data-act="group-add">＋添加一级文件夹</button><button type="button" class="btn sm danger" data-act="subj-del" data-sid="${E(subj.id)}">删除这个学科</button></div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">${itemsHtml}</div></div>`;
   }
-  $('#panel').innerHTML = `<h2>📚 学科模式</h2><p class="lead">按学科整理视频：学科 → 子目录（年级 / 知识点）→ 视频。首页和大屏会按这个目录展示，不会自动把改了分类标签的视频显示出来——必须放进这里才会被看到。</p>
-  <div class="card" style="padding:10px 16px"><div class="acts" style="margin:0"><div class="sws" style="gap:6px">${subjChips}</div><button type="button" class="btn sm primary" data-act="subj-add">＋新建学科</button></div></div>
+  $('#panel').innerHTML = `<h2>📚 学科模式</h2><p class="lead">按学科整理视频：学科 → 文件夹（可以一层层往下建，如 小学 → 三年级）→ 视频。大屏会按这个目录展示，必须放进这里才会被看到。</p>
+  <div class="card" style="padding:10px 16px"><div class="acts" style="margin:0"><div class="sws" style="gap:6px">${subjChips}</div><button type="button" class="btn sm primary" data-act="subj-add">＋新建学科</button>${tplBtn.replace('class="btn"', 'class="btn sm"')}</div></div>
   ${groupsHtml || '<p class="hint">还没有学科，点上面「＋新建学科」开始。</p>'}
   <div class="acts"><button type="button" class="btn" data-act="subjects-reset">恢复为公共学科目录</button></div>`;
 }
@@ -598,7 +642,7 @@ panel.addEventListener('input', e => {
   else if (sc === 'mission') { const st = curTrackObj().stages[s]; st.mission = st.mission || {text: '', url: '', label: ''}; st.mission[k] = val; }
   else if (sc === 'item') { curTrackObj().stages[s].items[i][k] = val; }
   else if (sc === 'subject') { curSubjObj()[k] = val; }
-  else if (sc === 'group') { curSubjObj().groups.find(x => x.id === curGroup)[k] = val; }
+  else if (sc === 'group') { curGrp().g[k] = val; }
   else if (sc === 'video') {
     const id = el.dataset.id, v = vmap()[id];
     if (v && v.custom) { const a = custom.addedVideos.filter(x => x.id === id)[0]; a[k] = k === 'minAge' ? (+val || 10) : val; }
@@ -710,13 +754,17 @@ panel.addEventListener('click', e => {
     case 'subj-pick': curSubj = a.dataset.sid; curGroup = ''; renderSubjects(); break;
     case 'subj-add': { const ns = {id: 's' + Date.now().toString(36), icon: '📚', name: '新学科', groups: []}; custom.subjects = custom.subjects || []; custom.subjects.push(ns); curSubj = ns.id; curGroup = ''; saveNow(); renderSubjects(); break; }
     case 'subj-del': { const sid = a.dataset.sid, sj = custom.subjects.find(x => x.id === sid); if (sj && confirm(`删除「${sj.name}」这个学科？`)) { custom.subjects = custom.subjects.filter(x => x.id !== sid); if (curSubj === sid) { curSubj = ''; curGroup = ''; } saveNow(); renderSubjects(); } break; }
+    case 'subj-math': addMathTemplate(); break;
     case 'group-pick': curGroup = a.dataset.gid; renderSubjects(); break;
-    case 'group-add': { const subj = curSubjObj(); if (!subj) break; const ng = {id: 'g' + Date.now().toString(36), name: '新子目录', videoIds: []}; subj.groups.push(ng); curGroup = ng.id; saveNow(); renderSubjects(); break; }
-    case 'group-del': { const subj = curSubjObj(), gid = a.dataset.gid, g = subj.groups.find(x => x.id === gid); if (g && confirm(`删除「${g.name}」这个子目录？`)) { subj.groups = subj.groups.filter(x => x.id !== gid); if (curGroup === gid) curGroup = ''; saveNow(); renderSubjects(); } break; }
+    case 'group-add': { const subj = curSubjObj(); if (!subj) break; const ng = mkGroup('新文件夹'); subj.groups.push(ng); curGroup = ng.id; saveNow(); renderSubjects(); break; }
+    case 'group-add-child': { const gr = curGrp(); if (!gr) break; const ng = mkGroup('新文件夹'); gr.g.children = gr.g.children || []; gr.g.children.push(ng); curGroup = ng.id; saveNow(); renderSubjects(); break; }
+    case 'group-up': { const gr = curGrp(); if (gr) { move(gr.list, gr.i, -1); saveNow(); renderSubjects(); } break; }
+    case 'group-down': { const gr = curGrp(); if (gr) { move(gr.list, gr.i, 1); saveNow(); renderSubjects(); } break; }
+    case 'group-del': { const gr = curGrp(); if (!gr) break; const n = (gr.g.children || []).length; if (confirm(`删除「${gr.g.name}」这个文件夹？${n ? `它下面的 ${n} 个子文件夹也会一起删除。` : ''}里面的视频只是移出学科，不会从视频清单里删掉。`)) { gr.list.splice(gr.i, 1); curGroup = ''; saveNow(); renderSubjects(); } break; }
     case 'gv-add': openGroupPicker(); break;
-    case 'gv-up': move(curSubjObj().groups.find(x => x.id === curGroup).videoIds, i, -1); saveNow(); renderSubjects(); break;
-    case 'gv-down': move(curSubjObj().groups.find(x => x.id === curGroup).videoIds, i, 1); saveNow(); renderSubjects(); break;
-    case 'gv-del': curSubjObj().groups.find(x => x.id === curGroup).videoIds.splice(i, 1); saveNow(); renderSubjects(); break;
+    case 'gv-up': move(curGrp().g.videoIds, i, -1); saveNow(); renderSubjects(); break;
+    case 'gv-down': move(curGrp().g.videoIds, i, 1); saveNow(); renderSubjects(); break;
+    case 'gv-del': curGrp().g.videoIds.splice(i, 1); saveNow(); renderSubjects(); break;
     case 'v-edit': openVideo = openVideo === vid ? '' : vid; renderVideos(); break;
     case 'v-hide': if (custom.hiddenVideos[vid]) delete custom.hiddenVideos[vid]; else custom.hiddenVideos[vid] = true; saveNow(); renderVideos(); break;
     case 'v-del': if (confirm('删除这条自己加的视频？')) { custom.addedVideos = custom.addedVideos.filter(x => x.id !== vid); delete custom.hiddenVideos[vid]; openVideo = ''; saveNow(); renderVideos(); } break;

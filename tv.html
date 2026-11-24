@@ -977,5 +977,376 @@ try {
   $('#msg').innerHTML = '<b>没加载出来</b>' + esc(err && err.message || err) + '<br>检查一下网络，刷新页面重试';
 }
 </script>
+<script>
+/* ---------- 学科模式（大屏新界面）：学科 | 多级文件夹 | 视频列表 | 预览与操作 ---------- */
+(function () {
+  'use strict';
+  if (typeof window.openSubjects !== 'function' || typeof window.play !== 'function') return; // 不是 tv.html，不处理
+
+  var d = document;
+  var q = function (s, el) { return (el || d).querySelector(s); };
+
+  // ---------- 样式 ----------
+  var css = [
+    '.sv{position:fixed;top:0;left:0;right:0;bottom:0;z-index:15;background:#0b1220;display:flex;flex-direction:column}',
+    '.sv[hidden]{display:none}',
+    '.sv-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1;background:radial-gradient(50rem 26rem at 90% -10%,rgba(47,134,224,.20),transparent 70%),radial-gradient(40rem 26rem at -5% 110%,rgba(15,159,163,.14),transparent 70%),#0b1220}',
+    '.sv-top{flex:none;height:4.6rem;padding:0 3rem;display:flex;align-items:center}',
+    '.sv-top b{font-size:1.5rem;font-weight:800;white-space:nowrap}',
+    '.sv-crumb{margin-left:1.2rem;color:#9fb0c8;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}',
+    '.sv-x{margin-left:auto;flex:none;padding:.55rem 1.3rem;border-radius:2rem;background:rgba(255,255,255,.14);border:0;color:#fff;font:inherit;font-size:1rem;font-weight:800;cursor:pointer}',
+    '.sv-body{flex:1;display:flex;min-height:0;padding:0 2.2rem 0 3rem}',
+    '.sv-c{position:relative;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:.4rem .5rem 1.5rem .4rem;margin-right:.9rem}',
+    '.sv-c0{width:11.5rem;flex:none}',
+    '.sv-c1{width:17rem;flex:none}',
+    '.sv-c2{width:28rem;flex:none}',
+    '.sv-c3{flex:1;min-width:0;margin-right:0}',
+    '.sv-c0,.sv-c1{border-right:1px solid rgba(255,255,255,.07);padding-right:1rem}',
+    '.sv-c2{border-right:1px solid rgba(255,255,255,.07);padding-right:1rem}',
+    /* 通用：选中 on = 当前选择；f = 当前栏里的焦点（白框） */
+    '.si,.fi,.vi,.sv-btn{border-radius:1rem;cursor:pointer}',
+    '.si.f,.fi.f,.vi.f,.sv-btn.f{box-shadow:0 0 0 .22rem #fff}',
+    /* 学科 */
+    '.si{padding:.95rem 1rem;margin-bottom:.6rem;background:#17233a}',
+    '.si .ic{display:block;font-size:1.7rem;line-height:1}',
+    '.si .nm{display:block;margin-top:.35rem;font-size:1.15rem;font-weight:800}',
+    '.si .ct{display:block;margin-top:.15rem;font-size:.8rem;color:#8fa1ba}',
+    '.si.on{background:linear-gradient(150deg,#3d5a8a,#264a7c)}',
+    '.si.on .ct{color:#cfe3ff}',
+    /* 文件夹 */
+    '.fi{display:flex;align-items:center;padding:.7rem .8rem;margin-bottom:.35rem;background:transparent}',
+    '.fi .ic{flex:none;font-size:1.15rem;margin-right:.55rem}',
+    '.fi .nm{flex:1;min-width:0;font-size:1.05rem;font-weight:700;line-height:1.3;color:#dbe4f2}',
+    '.fi .ct{flex:none;margin-left:.5rem;font-size:.8rem;font-weight:700;color:#8fa1ba}',
+    '.fi.on{background:#1f2f4a}',
+    '.fi.on .nm{color:#fff}',
+    '.fi.all .nm{font-weight:800}',
+    /* 视频列表 */
+    '.vi{display:flex;padding:.55rem;margin-bottom:.55rem;background:#141f33}',
+    '.vi .th{position:relative;flex:none;width:9.6rem;height:5.4rem;border-radius:.7rem;overflow:hidden;background:#1b2638}',
+    '.vi .th img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}',
+    '.vi .len{position:absolute;right:.35rem;bottom:.35rem;padding:.05rem .4rem;border-radius:.35rem;background:rgba(0,0,0,.72);font-size:.72rem;font-weight:700}',
+    '.vi .ok{position:absolute;left:.35rem;top:.35rem;padding:.05rem .4rem;border-radius:.35rem;background:#0f9457;font-size:.72rem;font-weight:800}',
+    '.vi .tx{flex:1;min-width:0;margin-left:.8rem}',
+    '.vi .t{font-size:.98rem;font-weight:700;line-height:1.4;color:#dfe6f1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+    '.vi .s{margin-top:.3rem;font-size:.8rem;color:#8193ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.vi.on{background:#1f2f4a}',
+    '.vi.on .t{color:#fff}',
+    '.vi.done .th img{opacity:.55}',
+    /* 预览 */
+    '.sv-c3{padding-left:.6rem}',
+    '.pbox{position:relative;width:100%;padding-top:56.25%;border-radius:1.1rem;overflow:hidden;background:#1b2638;cursor:pointer}',
+    '.pbox img,.pbox iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;object-fit:cover}',
+    '.pbox .pp{position:absolute;left:50%;top:50%;width:4rem;height:4rem;margin:-2rem 0 0 -2rem;border-radius:50%;background:rgba(255,255,255,.93);color:#13203a;font-size:1.6rem;line-height:4rem;text-align:center;padding-left:.25rem}',
+    '.pinfo{margin-top:1rem}',
+    '.pinfo .pt{font-size:1.45rem;font-weight:800;line-height:1.4}',
+    '.pinfo .pm{margin-top:.5rem;font-size:1rem;color:#aebbd0;line-height:1.6}',
+    '.pinfo .pd{margin-top:.5rem;font-size:.92rem;color:#8fa1ba;line-height:1.6;max-height:4.8em;overflow:hidden}',
+    '.pinfo .tag{display:inline-block;margin-right:.6rem;padding:.1rem .6rem;border-radius:2rem;background:rgba(255,255,255,.1);font-size:.85rem;font-weight:700;color:#cfdaec}',
+    '.pinfo .tag.ok{background:#0f9457;color:#fff}',
+    '.pbtns{margin-top:1.1rem;display:flex;flex-wrap:wrap}',
+    '.sv-btn{margin:0 .8rem .8rem 0;padding:.8rem 1.4rem;background:#22314d;font-size:1.08rem;font-weight:800;color:#fff;white-space:nowrap}',
+    '.sv-btn.main{background:linear-gradient(135deg,#2f9cf0,#6b6ff0)}',
+    '.sv-btn.on{background:#0f9457}',
+    '.sv-btn.main.on{background:linear-gradient(135deg,#2f9cf0,#6b6ff0)}',
+    /* 空状态 */
+    '.sv-empty{padding:3rem 1rem;text-align:center;color:#8fa1ba;font-size:1.05rem;line-height:1.7}',
+    '.sv-empty b{display:block;font-size:1.3rem;color:#dfe6f1;margin-bottom:.4rem}',
+    /* 底部按键提示 */
+    '.sv-keys{flex:none;height:3rem;padding:0 3rem;display:flex;align-items:center;font-size:.92rem;color:#9fb0c8;background:rgba(5,8,15,.55)}',
+    '.sv-keys span{margin-right:1.8rem;white-space:nowrap}',
+    '.sv-keys kbd{display:inline-block;min-width:1.8rem;padding:.05rem .45rem;margin-right:.4rem;border-radius:.4rem;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);font:inherit;font-weight:800;text-align:center;color:#e6edf8}',
+    'body.touch .sv-keys{display:none}',
+    'body:not(.touch) .sv-x{display:none}'
+  ].join('\n');
+  var st = d.createElement('style');
+  st.appendChild(d.createTextNode(css));
+  d.head.appendChild(st);
+
+  // ---------- 数据：把学科 → 文件夹（可多级）整理成「侧栏列表 + 每个文件夹的视频」 ----------
+  var SV = {si: 0, fi: 0, vi: 0, col: 0, btn: 0, pv: false, folders: [], items: []};
+  var svOpen = false, svEl = null, svSkip = 0, svT = 0;
+
+  function kids(n) { return n.children || n.folders || n.groups || []; }
+  function vidsOf(ids) { return (ids || []).map(function (id) { return byId[id]; }).filter(function (v) { return v && !v.dead; }); }
+
+  // 一个文件夹的视频 = 自己的 + 所有下级文件夹的（from 记录视频来自哪个下级文件夹）
+  function collect(node, label, out, seen) {
+    vidsOf(node.videoIds).forEach(function (v) { if (!seen[v.id]) { seen[v.id] = 1; out.push({v: v, from: label}); } });
+    kids(node).forEach(function (c) { collect(c, c.name || '', out, seen); });
+  }
+
+  function buildFolders(subj) {
+    var res = [];
+    function add(node, depth, isAll) {
+      var items = [];
+      collect(node, '', items, {});
+      res.push({name: node.name || '未命名', depth: depth, all: !!isAll, hasKids: kids(node).length > 0, items: items,
+        done: items.filter(function (it) { return isDone(it.v.id); }).length});
+    }
+    add({name: '全部', videoIds: [], children: subj.groups || []}, 0, true);
+    (function walk(list, depth) {
+      list.forEach(function (g) { add(g, depth, false); walk(kids(g), depth + 1); });
+    })(subj.groups || [], 0);
+    return res;
+  }
+
+  function curSubj() { return (D.subjects || [])[SV.si]; }
+  function curFolder() { return SV.folders[SV.fi]; }
+  function curItem() { return SV.items[SV.vi]; }
+  function loadItems() { var f = curFolder(); SV.items = f ? f.items : []; if (SV.vi >= SV.items.length) SV.vi = 0; }
+
+  // ---------- 渲染 ----------
+  var esc2 = function (s) { return esc(s == null ? '' : String(s)); };
+
+  function rSubj() {
+    q('#sv-c0').innerHTML = (D.subjects || []).map(function (s, i) {
+      var all = buildFolders(s)[0];
+      return '<div class="si" data-c="0" data-i="' + i + '"><span class="ic">' + esc2(s.icon || '📚') + '</span><span class="nm">' + esc2(s.name) + '</span><span class="ct">' + all.items.length + ' 个视频</span></div>';
+    }).join('');
+  }
+
+  function rFold() {
+    var h = SV.folders.map(function (f, i) {
+      var ic = f.all ? '🗂️' : (f.hasKids ? '📂' : '📁');
+      return '<div class="fi' + (f.all ? ' all' : '') + '" data-c="1" data-i="' + i + '" style="padding-left:' + (0.8 + f.depth * 1.1) + 'rem"><span class="ic">' + ic + '</span><span class="nm">' + esc2(f.name) + '</span><span class="ct">' + (f.items.length ? f.done + '/' + f.items.length : '空') + '</span></div>';
+    }).join('');
+    if (SV.folders.length <= 1) h += '<div class="sv-empty"><b>还没有文件夹</b>去编辑器里给「' + esc2((curSubj() || {}).name) + '」添加文件夹</div>';
+    q('#sv-c1').innerHTML = h;
+  }
+
+  function viHTML(it, i) {
+    var v = it.v;
+    return '<div class="vi' + (isDone(v.id) ? ' done' : '') + '" data-c="2" data-i="' + i + '"><div class="th">' +
+      (v.cover ? '<img data-src="' + esc2(coverUrl(v)) + '" alt="" referrerpolicy="no-referrer">' : '') +
+      (isDone(v.id) ? '<span class="ok">✓</span>' : '') + '<span class="len">' + esc2(lenLabel(v)) + '</span></div>' +
+      '<div class="tx"><p class="t">' + esc2(v.title) + '</p><p class="s">' + (it.from ? '📁 ' + esc2(it.from) + ' · ' : '') + esc2(who(v)) + '</p></div></div>';
+  }
+
+  function rList() {
+    var box = q('#sv-c2');
+    if (!SV.items.length) {
+      var f = curFolder();
+      box.innerHTML = '<div class="sv-empty"><b>' + (f ? '「' + esc2(f.name) + '」里还没有视频' : '没有视频') + '</b>去编辑器里把视频放进这个文件夹</div>';
+      return;
+    }
+    box.innerHTML = SV.items.map(viHTML).join('');
+    lazyImages(box);
+  }
+
+  function btnDefs() {
+    var it = curItem(), done = it && isDone(it.v.id);
+    return [
+      {k: 'play', t: '▶ 全屏播放', main: true},
+      {k: 'pv', t: SV.pv ? '⏹ 关闭预览' : '👀 小窗预览'},
+      {k: 'done', t: done ? '✓ 已看完（点取消）' : '✓ 标记看完', on: done},
+      {k: 'explore', t: '🔬 乐探究'}
+    ];
+  }
+
+  function mediaHTML(v) {
+    if (SV.pv) return '<div class="pbox"><iframe allow="autoplay; encrypted-media" allowfullscreen tabindex="-1" src="' + esc2(embedUrl(v) + '&muted=1') + '"></iframe></div>';
+    return '<div class="pbox" data-c="3" data-i="0">' + (v.cover ? '<img src="' + esc2(coverUrl(v)) + '" alt="" referrerpolicy="no-referrer">' : '') + '<span class="pp">▶</span></div>';
+  }
+
+  function rPrev() {
+    var box = q('#sv-c3'), it = curItem();
+    if (!it) { box.innerHTML = '<div class="sv-empty"><b>选一个视频</b>选中后这里会显示预览，按 OK 播放</div>'; return; }
+    var v = it.v, f = curFolder(), s = curSubj();
+    var path = esc2(s.name) + ' › ' + esc2(f && !f.all ? f.name : '全部') + (it.from ? ' › ' + esc2(it.from) : '');
+    box.innerHTML = mediaHTML(v) +
+      '<div class="pinfo"><p class="pt">' + esc2(v.title) + '</p>' +
+      '<p class="pm"><span class="tag" id="sv-done-tag"></span><span class="tag">' + esc2(lenLabel(v)) + '</span>' + esc2(who(v)) + (v.orig ? '（搬运）' : '') + '</p>' +
+      '<p class="pm">📁 ' + path + '</p>' + (v.desc ? '<p class="pd">' + esc2(v.desc) + '</p>' : '') + '</div>' +
+      '<div class="pbtns" id="sv-btns">' + btnDefs().map(function (b, i) {
+        return '<div class="sv-btn' + (b.main ? ' main' : '') + '" data-c="3" data-i="' + i + '"></div>';
+      }).join('') + '</div>';
+  }
+
+  function stopPreview() { if (SV.pv) { SV.pv = false; var f = q('#sv-c3 iframe'); if (f) f.parentNode.removeChild(f); } }
+
+  // ---------- 选中框 ----------
+  function reveal(box, el) {
+    if (!el) return;
+    var top = el.offsetTop, bot = top + el.offsetHeight;
+    if (top < box.scrollTop + 8) box.scrollTop = Math.max(0, top - 8);
+    else if (bot > box.scrollTop + box.clientHeight - 8) box.scrollTop = bot - box.clientHeight + 8;
+  }
+  function mark(box, idx, active) {
+    var ch = box.children, k, cls;
+    for (k = 0; k < ch.length; k++) {
+      if (!ch[k].getAttribute('data-i')) continue;
+      cls = ch[k].className.replace(/ (on|f)\b/g, '');
+      if (k === idx) { cls += ' on'; if (active) cls += ' f'; }
+      ch[k].className = cls;
+    }
+    reveal(box, ch[idx]);
+  }
+  function paint() {
+    var S = SV, c = [q('#sv-c0'), q('#sv-c1'), q('#sv-c2'), q('#sv-c3')];
+    mark(c[0], S.si, S.col === 0);
+    mark(c[1], S.fi, S.col === 1);
+    if (S.items.length) mark(c[2], S.vi, S.col === 2);
+    // 右侧按钮
+    var bs = q('#sv-btns'), defs = btnDefs(), k, el, cls;
+    if (bs) for (k = 0; k < bs.children.length; k++) {
+      el = bs.children[k];
+      el.textContent = defs[k].t;
+      cls = 'sv-btn' + (defs[k].main ? ' main' : '') + (defs[k].on ? ' on' : '');
+      if (S.col === 3 && S.btn === k) cls += ' f';
+      el.className = cls;
+    }
+    var it = curItem(), tag = q('#sv-done-tag');
+    if (tag && it) { var dn = isDone(it.v.id); tag.textContent = dn ? '✓ 看过' : '还没看'; tag.className = 'tag' + (dn ? ' ok' : ''); }
+    var s = curSubj(), f = curFolder();
+    q('#sv-crumb').textContent = s ? s.name + ' › ' + (f ? f.name : '') + (SV.items.length ? '　共 ' + SV.items.length + ' 个视频' : '') : '';
+  }
+
+  // ---------- 状态变化 ----------
+  function changeSubj(i) {
+    var n = (D.subjects || []).length;
+    i = Math.max(0, Math.min(i, n - 1));
+    if (i === SV.si && SV.folders.length) return;
+    SV.si = i; SV.fi = 0; SV.vi = 0; stopPreview();
+    SV.folders = buildFolders(curSubj());
+    loadItems(); rFold(); rList(); rPrev(); paint();
+  }
+  function changeFolder(i) {
+    i = Math.max(0, Math.min(i, SV.folders.length - 1));
+    if (i === SV.fi) return;
+    SV.fi = i; SV.vi = 0; stopPreview();
+    loadItems(); rList(); rPrev(); paint();
+  }
+  function changeVideo(i) {
+    i = Math.max(0, Math.min(i, SV.items.length - 1));
+    if (i === SV.vi) return;
+    SV.vi = i; stopPreview();
+    rPrev(); paint();
+  }
+
+  // 看完 / 取消后：刷新各栏的计数，滚动位置保持不动
+  function refreshCounts() {
+    if (!svOpen) return;
+    var c1 = q('#sv-c1'), c2 = q('#sv-c2'), a = c1.scrollTop, b = c2.scrollTop;
+    SV.folders = buildFolders(curSubj());
+    loadItems(); rFold(); rList();
+    c1.scrollTop = a; c2.scrollTop = b;
+    paint();
+  }
+
+  // ---------- 动作 ----------
+  function playCurrent() {
+    var it = curItem(), s = curSubj(), f = curFolder();
+    if (!it) { toast('这个文件夹里还没有视频'); return; }
+    stopPreview();
+    play(SV.items.map(function (x) { return x.v; }), SV.vi, s.name + ' · ' + (f ? f.name : ''), false);
+  }
+  function doAction(k) {
+    var it = curItem();
+    if (!it) return;
+    if (k === 'play') playCurrent();
+    else if (k === 'pv') { SV.pv = !SV.pv; var keep = SV.btn; rPrev(); SV.btn = keep; paint(); }
+    else if (k === 'done') {
+      if (isDone(it.v.id)) { setDone(it.v.id, false); toast('已取消「看完了」'); refreshTop(); }
+      else markDone(it.v);
+      refreshCounts();
+    } else if (k === 'explore') openVideoExplore(it.v);
+  }
+
+  // ---------- 遥控器 ----------
+  function svKey(k) {
+    var S = SV;
+    if (k === 'back') { if (S.col > 0) { S.col--; paint(); } else closeSV(); return; }
+    if (k === 'menu') { closeSV(); return; }
+    if (k === 'explore') { doAction('explore'); return; }
+    if (S.col === 0) {
+      if (k === 'up') { changeSubj(S.si - 1); }
+      else if (k === 'down') { changeSubj(S.si + 1); }
+      else if (k === 'right' || k === 'ok') { S.col = 1; paint(); }
+    } else if (S.col === 1) {
+      if (k === 'up') changeFolder(S.fi - 1);
+      else if (k === 'down') changeFolder(S.fi + 1);
+      else if (k === 'left') { S.col = 0; paint(); }
+      else if (k === 'right' || k === 'ok') { if (S.items.length) { S.col = 2; paint(); } else toast('这个文件夹里还没有视频'); }
+    } else if (S.col === 2) {
+      if (k === 'up') changeVideo(S.vi - 1);
+      else if (k === 'down') changeVideo(S.vi + 1);
+      else if (k === 'left') { S.col = 1; paint(); }
+      else if (k === 'right') { S.col = 3; S.btn = 0; paint(); }
+      else if (k === 'ok') playCurrent();
+    } else {
+      if (k === 'up') { S.btn = Math.max(0, S.btn - 1); paint(); }
+      else if (k === 'down') { S.btn = Math.min(btnDefs().length - 1, S.btn + 1); paint(); }
+      else if (k === 'left') { S.col = 2; paint(); }
+      else if (k === 'ok') doAction(btnDefs()[S.btn].k);
+    }
+  }
+
+  // ---------- 打开 / 关闭 ----------
+  function build() {
+    svEl = d.createElement('section');
+    svEl.className = 'sv';
+    svEl.id = 'sv';
+    svEl.hidden = true;
+    svEl.innerHTML = '<div class="sv-bg"></div>' +
+      '<div class="sv-top"><b>📚 学科模式</b><span class="sv-crumb" id="sv-crumb"></span><button type="button" class="sv-x" data-c="x">✕ 返回首页</button></div>' +
+      '<div class="sv-body"><div class="sv-c sv-c0" id="sv-c0"></div><div class="sv-c sv-c1" id="sv-c1"></div><div class="sv-c sv-c2" id="sv-c2"></div><div class="sv-c sv-c3" id="sv-c3"></div></div>' +
+      '<div class="sv-keys"><span><kbd>▲</kbd><kbd>▼</kbd>选择</span><span><kbd>◀</kbd><kbd>▶</kbd>切换栏</span><span><kbd>OK</kbd>确认 / 播放</span><span><kbd>返回</kbd>上一栏</span><span><kbd>E</kbd>乐探究</span></div>';
+    d.body.appendChild(svEl);
+
+    svEl.addEventListener('click', function (e) {
+      var el = e.target.closest ? e.target.closest('[data-c]') : null;
+      if (!el) return;
+      var c = el.getAttribute('data-c'), i = +el.getAttribute('data-i');
+      if (c === 'x') { closeSV(); return; }
+      if (c === '0') { changeSubj(i); SV.col = 1; paint(); }
+      else if (c === '1') { changeFolder(i); SV.col = SV.items.length ? 2 : 1; paint(); }
+      else if (c === '2') { if (SV.vi === i && SV.col === 2) playCurrent(); else { changeVideo(i); SV.col = 2; paint(); } }
+      else if (c === '3') { SV.col = 3; SV.btn = i; paint(); doAction(btnDefs()[i].k); }
+    });
+  }
+
+  function openSV() {
+    var subs = D.subjects || [];
+    if (!subs.length) { toast('还没有学科，去编辑器里添加语文、数学……', 3000); return; }
+    if (!svEl) build();
+    SV.si = Math.max(0, Math.min(SV.si, subs.length - 1));
+    SV.folders = buildFolders(subs[SV.si]);
+    SV.fi = Math.min(SV.fi, SV.folders.length - 1);
+    loadItems();
+    svEl.hidden = false; svOpen = true;
+    navPush('sv'); svT = Date.now();
+    rSubj(); rFold(); rList(); rPrev(); paint();
+  }
+
+  function closeSV(fromPop) {
+    if (!svOpen) return;
+    stopPreview();
+    svEl.hidden = true; svOpen = false;
+    if (!fromPop) { var b = navDepth; navPop(); if (navDepth < b) svSkip++; }
+    refreshTop();
+  }
+
+  // ---------- 接管 tv.html 的入口 ----------
+  window.openSubjects = openSV;
+
+  // 遥控器按键：学科界面打开、且没在播放 / 没弹窗时，由这里处理
+  var oldKey = window.tvKey;
+  window.tvKey = function (k) {
+    if (svOpen && !P && !PN && !modalOpen()) { svKey(k); return ''; }
+    return oldKey(k);
+  };
+
+  // 播放完回来：刷新「看过」状态
+  var oldLeave = window.leavePlayer;
+  window.leavePlayer = function (fromPop) { svT = Date.now(); oldLeave(fromPop); if (svOpen) refreshCounts(); };
+
+  // 安卓 / 浏览器自带的返回：先关学科界面
+  window.addEventListener('popstate', function () {
+    if (svSkip > 0) { svSkip--; return; }
+    if (svOpen && !P && !PN && !modalOpen() && Date.now() - svT > 80) closeSV(true);
+  });
+})();
+</script>
 </body>
 </html>
